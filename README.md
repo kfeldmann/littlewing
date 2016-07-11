@@ -8,10 +8,12 @@ and litterally can do anything that aws-cli can do.
 ## How does it work
 
 To put it simply, Terraflop runs aws-cli commands that you specify
-in your configuration, and stores the output so that subsequent
-commands can make use of it. For example, imagine you're using
-aws-cli. You create a VPC. You create an Internet Gateway. Now, to
-attach the gateway to the VPC you need to remember the ID of each.
+in your configuration, and stores the output (typically the output
+contains all of the details of the resource created or referenced by
+the command) so that subsequent commands can make use of that data.
+For example, imagine you're using
+aws-cli by itself. You create a VPC. You create an Internet Gateway. Next, to
+attach the gateway to the VPC you will need the ID of each.
 If you want to automate the setup of these items, then your _automation_
 needs to be able to remember these IDs. Terraflop is designed to
 do exactly that.
@@ -40,9 +42,9 @@ in addition to creating resources.
 - Install and configure aws-cli per Amazon's instructions
 - Install python 2.7
 - Install pyyaml
-- Clone Terraflop
+- Clone or download Terraflop
 - Put the 'flop' command in your path
-   - Move, copy, or symlink it into a directory that is already
+   - Copy, or symlink it into a directory that is already
      in your path, or...
    - Extend your path to cover the directory where 'flop' resides
 
@@ -62,6 +64,41 @@ they sort unambiguously (see example-apps).
     10_app.yml
     20_web-tier.yml
     30_database-tier.yml
+
+The configuration files use YAML (.yml) format. YAML is a
+standard format documented elsewhere.
+
+In Terraflop, the commands to be run are called steps. Steps are
+constructed using the following structure:
+
+    steps:
+    - aws.CATEGORY.COMMAND.NAME:
+      - ARG
+      - ...
+
+where CATEGORY is the command category in aws-cli, such as:
+ec2, iam, autoscaling, etc.
+
+COMMAND is the aws-cli command, such as: create-vpc, etc.
+
+NAME is a unique name for this instance of this command. This will
+allow you to distinguish between multiple uses of the same command.
+For example, if you are creating three subnets, you will call
+create-subnet three times. Provide three names to distinguish them.
+This is also how you will distinguish the subnets when you refer
+to them in subsequent steps.
+
+The arguments (ARG, ...) are exactly what you would pass to aws-cli for
+the same command. If a given command requires an argument of '--foo'
+and it's value of 'bar', those two separate strings should be listed in that
+order under the command.
+
+Example:
+
+    steps:
+    - aws.ec2.describe-network-acls.default-acl:
+      - --filters
+      - Name=default,Values=true
 
 For each step, Terraflop first checks the output directory
 (.terraflop-output in the current working directory) to see if
