@@ -93,6 +93,9 @@ the same command. If a given command requires an argument of '--foo'
 and it's value of 'bar', those two separate strings should be listed in that
 order under the command.
 
+There should be at most one 'steps:' key in each file. This 'steps:' object
+is a list that contains all of the steps for that file.
+
 Example:
 
     steps:
