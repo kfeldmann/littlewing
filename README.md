@@ -1,21 +1,36 @@
 # Terraflop - Infrastructure Automation
 
-Terraflop is a simple infrastructure automation tool. It can be used
-to create and manage version controlled infrastructure as if it were
-software.
+Terraflop is a simple infrastructure automation tool.
 
-Terraflop supports only AWS at this point. It leverages aws-cli,
-and it litterally can do anything that aws-cli can do.
+Terraflop supports only AWS. It leverages aws-cli,
+and litterally can do anything that aws-cli can do.
 
 ## How does it work
 
 To put it simply, Terraflop runs aws-cli commands that you specify
 in your configuration, and stores the output so that subsequent
-commands can make use of it.
+commands can make use of it. For example, imagine you're using
+aws-cli. You create a VPC. You create an Internet Gateway. Now, to
+attach the gateway to the VPC you need to remember the ID of each.
+If you want to automate the setup of these items, then your _automation_
+needs to be able to remember these IDs. Terraflop is designed to
+do exactly that.
 
-That's it.
+Here is what that exercise looks like in Terraflop:
 
-But with this capability, quite a lot can be achieved. You can
+    - aws.ec2.create-vpc.main:
+      - --cidr-block
+      - 10.0.0.0/16
+    
+    - aws.ec2.create-internet-gateway.main: null
+    
+    - aws.ec2.attach-internet-gateway.main:
+      - --internet-gateway-id
+      - ${aws.ec2.create-internet-gateway.main.InternetGateway.InternetGatewayId}
+      - --vpc-id
+      - ${aws.ec2.create-vpc.main.Vpc.VpcId}
+
+With this basic capability, quite a lot can be achieved. You can
 use variables (even nested variables) to dynamically name resources,
 and use aws-cli's full functionality to query, modify, or execute actions
 in addition to creating resources.
