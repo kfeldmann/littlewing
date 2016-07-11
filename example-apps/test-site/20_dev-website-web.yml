@@ -1,0 +1,66 @@
+var.environment: dev
+var.subsystem: website
+var.tier: web
+
+var.elb-0-scheme: internet-facing # (internet-facing | internal)
+var.elb-0-idle-timeout: 15 # 1-3600 seconds
+var.elb-0-connection-draining-timeout: 5
+var.elb-0-healthcheck-url: "http:80/" # proto ":" port [path]
+var.elb-0-healthcheck-interval: 60 # 5 to 300 sec
+var.elb-0-healthcheck-timeout: 15 # 2 to 60 sec (must be < healthcheck-interval)
+var.elb-0-healthcheck-unhealthy-threshold: 5 # 2 to 10 failures
+var.elb-0-healthcheck-healthy-threshold: 2 # 2 to 10 successes
+var.elb-0-listener-0-port: 80
+var.elb-0-listener-0-protocol: http # (tcp|ssl|http|https)
+var.elb-0-instance-0-port: 80
+var.elb-0-instance-0-protocol: http # (tcp|ssl|http|https)
+
+var.blue-lc-version: 201607101606
+var.blue-scale-min: 1
+var.blue-scale-desired: 1
+var.blue-scale-max: 1
+var.green-lc-version: 201607101606
+var.green-scale-min: 0
+var.green-scale-desired: 0
+var.green-scale-max: 0
+
+var.image-owner: amazon
+var.image-name: amzn-ami-minimal-hvm-2016.03.0.x86_64-ebs
+var.root-volume-size: 2 # GB
+var.grace-period: 300
+var.cooldown: 300
+var.user-data: |
+  #cloud-config
+  packages:
+  - httpd24
+  write_files:
+  - path: /var/www/html/index.html
+    permissions: '0444'
+    content: Hello world.
+  runcmd:
+  - /sbin/service httpd start
+var.instance-type: t2.nano
+var.instance-role-policy: |
+  {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "FullS3",
+        "Effect": "Allow",
+        "Action": "s3:*",
+        "Resource": "*"
+      },
+      {
+        "Sid": "KmsEncryption",
+        "Effect": "Allow",
+        "Action": [
+          "kms:Decrypt",
+          "kms:Encrypt",
+          "kms:ReEncrypt*"
+        ],
+        "Resource": [
+          "*"
+        ]
+      }
+    ]
+  }

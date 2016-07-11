@@ -1,0 +1,214 @@
+#!/usr/bin/python2.7 -O
+
+import sys
+import yaml
+import json
+import os
+import re
+import subprocess
+
+awscli = os.environ.get('AWSCLI', '/usr/bin/aws')
+filename = '(none)'
+lineno = '(none)'
+
+def e(message):
+    sys.stderr.write('ERROR: %s on line %s\n' % (filename, lineno))
+    sys.stderr.write('ERROR: %s\n' % message)
+    raise SystemExit, 1
+
+def w(message):
+    sys.stderr.write('WARN: %s\n' % message)
+    return None
+
+def info(message):
+    sys.stdout.write('INFO: %s\n' % message)
+    return None
+
+def d(message):
+    if os.environ.get('DEBUG', False):
+        sys.stdout.write('DEBUG: %s\n' % message)
+    return None
+
+def __varsub(in_str):
+    d('__varsub(): starting with in_str = %s' % in_str)
+    words = in_str.split('.')
+    d('__varsub(): words = %s' % repr(words))
+    if words[0] == 'var':
+        if len(words) == 2:
+            if words[1] in var:
+                return var[words[1]]
+            else:
+                e('Unknown variable: %s' % words[1])
+        elif len(words) == 3:
+            if words[1] in var:
+                return var[words[1]][words[2]]
+            else:
+                e('Unknown variable: %s.%s' % (words[1], words[2]))
+    fname = '.'.join(words[:4])
+    try:
+        f = open('.terraflop-output/%s' % fname, 'r')
+        filename = '.terraflop-output/%s' % fname
+    except IOError:
+        e('Unknown resource: %s' % fname)
+    lineno = 0
+    while True:
+        line = f.readline()
+        lineno += 1
+        if line == '':
+            break
+        line = line.strip()
+        try:
+            n,v = line.split(':', 1)
+        except ValueError:
+            f.close()
+            e('Malformed line in output file (%s): %s' % (fname, line))
+        if n == in_str:
+            f.close()
+            return v
+    f.close()
+    e('Unknown resource attribute: %s' % in_str)
+
+def varsub(val):
+    d('varsub(): starting with val = %s' % val)
+    if type(val) == type(None):
+        return val
+    if type(val) == type(0):
+        return str(val)
+    i = 0
+    while i < 10:
+        s = re.search(r'\$\{([^${}]+)\}', val)
+        try:
+            s.group(1)
+        except (IndexError, AttributeError):
+            break
+        d('varsub(): s.group(0) = %s' % s.group(0))
+        d('varsub(): s.group(1) = %s' % s.group(1))
+        needle = s.group(0).replace('$', '\$')
+        val = re.sub(needle, __varsub(s.group(1)), val)
+        i += 1
+    return val
+
+def call_by_args(region, profile, cmdtuple, argtuple):
+    args=[ \
+      awscli,
+      '--region', region,
+      '--profile', profile,
+    ]
+    args.extend(cmdtuple)
+    if argtuple:
+        args.extend(argtuple)
+    try:
+        outdata = subprocess.check_output(args)
+    except Exception as ex:
+        e('Failed to run %s %s %s: %s' % (awscli, cmdtuple[0], cmdtuple[1], ex))
+    if outdata: # Some calls do not return data
+        try:
+            outdict = json.loads(outdata)
+        except Exception as ex:
+            e( \
+            """Failed to parse json response from %s %s %s.
+            Exception is: %s
+            JSON source:
+            %s
+            """ % (awscli, cmdtuple[0], cmdtuple[1], ex, outdata))
+    else:
+        outdict = None
+    return outdict
+
+def stringify(path, name, obj):
+    strings = []
+    if obj == None:
+        return strings
+    if type(obj) == type({}):
+        for k in obj.keys():
+            strings.extend(stringify('%s.%s' % (path, name), k, obj[k]))
+    elif type(obj) == type([]):
+        i = 0
+        for item in obj:
+            strings.extend(stringify('%s.%s' % (path, name), i, item))
+            i += 1
+    else:
+        this = '%s.%s:%s' % (path, name, str(obj))
+        strings.append(this.strip('.'))
+    return strings
+
+def store_output(name, outdict):
+    try:
+        f = open('.terraflop-output/%s' % name, 'w')
+    except IOError:
+        e('Failed to open output file: %s' % name)
+    for line in stringify('', name, outdict):
+        f.write('%s\n' % line)
+    f.close()
+    return None
+
+def varsub_tuple(intuple):
+    if intuple == None:
+        return None
+    outtuple = []
+    for item in intuple:
+        outtuple.append(varsub(item))
+    return outtuple
+
+if not os.path.exists('.terraflop-output'):
+    os.mkdir('.terraflop-output')
+
+all_files = os.listdir('.')
+input_files = []
+for f in all_files:
+    if f[-4:] == '.yml':
+        input_files.append(f)
+input_files.sort()
+
+region = None
+profile = None
+var = {}
+var['USER'] = os.environ.get('USER', 'terraflop')
+
+for in_file in input_files:
+    f = open(in_file, 'r')
+    filename = in_file
+    lineno = '(unknown yaml)'
+    yd = yaml.load(f)
+    f.close()
+    # Have to make sure we load all the vars before the steps
+    for k in yd.keys():
+        if k[:4] == 'var.':
+            lineno = '(%s...)' % str(k)[:10]
+            if type(yd[k]) == type('a'):
+                var[k[4:]] = varsub(yd[k])
+            elif type(yd[k]) == type(0):
+                var[k[4:]] = str(yd[k])
+            else:
+                var[k[4:]] = yd[k]
+    for k in yd.keys():
+        if k == 'steps':
+            for step in yd[k]:
+                step_key = step.keys()[0]
+                lineno = '(%s)' % step_key
+                rsrc_pathname = varsub(step_key)
+                if rsrc_pathname == 'region':
+                    region = varsub(step[step_key])
+                    continue
+                if rsrc_pathname == 'profile':
+                    profile = varsub(step[step_key])
+                    continue
+                if rsrc_pathname[:4] == 'var.':
+                    if type(yd[k]) == type('a'):
+                        var[k[4:]] = varsub(yd[k])
+                    else:
+                        var[k[4:]] = yd[k]
+                    continue
+                if os.path.exists('.terraflop-output/%s' % rsrc_pathname):
+                    info('%s has already been run.' % rsrc_pathname)
+                    continue
+                words = rsrc_pathname.split('.')
+                if words[0] == 'aws':
+                    cmdtuple = (words[1], words[2])
+                    argtupleraw = step[step_key]
+                    info('Running %s' % rsrc_pathname)
+                    outdict = call_by_args(region, profile, cmdtuple, varsub_tuple(argtupleraw))
+                    store_output(rsrc_pathname, outdict)
+                else:
+                    e('Unrecognized provider: %s' % words[0])
+

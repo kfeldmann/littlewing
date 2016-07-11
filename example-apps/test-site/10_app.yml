@@ -1,0 +1,27 @@
+var.profile: sandbox
+var.region: us-west-2
+var.appname: test-site
+var.ssh-key-name: test-site
+
+var.vpc-cidr: 10.0.0.0/16
+var.az_letter_0: a
+var.az_letter_1: b
+var.subnets:
+  dev-website-web-a: 10.0.0.0/24
+  dev-website-web-b: 10.0.1.0/24
+  dev-website-database-a: 10.0.2.0/24
+  dev-website-database-b: 10.0.3.0/24
+  prod-website-web-a: 10.0.4.0/24
+  prod-website-web-b: 10.0.5.0/24
+  prod-website-database-a: 10.0.6.0/24
+  prod-website-database-b: 10.0.7.0/24
+
+# Named IP ranges to use in security group rules
+var.developer-cidr: x.x.x.x/x # <-- Put your location's egress IP range here
+
+steps:
+- profile: ${var.profile}
+- region: ${var.region}
+- aws.ec2.describe-prefix-lists.${var.region}-s3:
+  - --filters
+  - Name=prefix-list-name,Values=com.amazonaws.${var.region}.s3

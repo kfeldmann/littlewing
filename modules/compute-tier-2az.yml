@@ -1,0 +1,509 @@
+# Creates compute tier in two az's, with one ELB,
+# with one non-secure listener.
+
+# Required vars
+#   var.appname
+#   var.environment
+#   var.subsystem
+#   var.tier
+#   var.az_letter_0
+#   var.az_letter_1
+#   var.subnets.*
+#   var.region
+#   var.elb-0-scheme
+#   var.elb-0-idle-timeout
+#   var.elb-0-connection-draining-timeout
+#   var.elb-0-healthcheck-url
+#   var.elb-0-healthcheck-interval
+#   var.elb-0-healthcheck-timeout
+#   var.elb-0-healthcheck-unhealthy-threshold
+#   var.elb-0-healthcheck-healthy-threshold
+#   var.elb-0-listener-0-port
+#   var.elb-0-listener-0-protocol
+#   var.elb-0-instance-0-port
+#   var.elb-0-instance-0-protocol
+#   var.blue-lc-version
+#   var.green-lc-version
+#   var.image-owner
+#   var.image-name
+#   var.root-volume-size
+#   var.ssh-key-name
+#   var.user-data
+#   var.instance-type
+#   var.instance-role-policy
+#   var.blue-scale-min
+#   var.blue-scale-desired
+#   var.blue-scale-max
+#   var.green-scale-min
+#   var.green-scale-desired
+#   var.green-scale-max
+#   var.grace-period
+#   var.cooldown
+
+
+steps:
+
+- aws.ec2.create-subnet.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_0}:
+  - --vpc-id
+  - ${aws.ec2.create-vpc.main.Vpc.VpcId}
+  - --cidr-block
+  - ${var.subnets.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_0}}
+  - --availability-zone
+  - ${var.region}${var.az_letter_0}
+
+- aws.ec2.create-subnet.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_1}:
+  - --vpc-id
+  - ${aws.ec2.create-vpc.main.Vpc.VpcId}
+  - --cidr-block
+  - ${var.subnets.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_1}}
+  - --availability-zone
+  - ${var.region}${var.az_letter_1}
+
+- aws.ec2.create-tags.subnets-${var.environment}-${var.subsystem}-${var.tier}:
+  - --resources
+  - ${aws.ec2.create-subnet.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_0}.Subnet.SubnetId}
+  - ${aws.ec2.create-subnet.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_1}.Subnet.SubnetId}
+  - --tags
+  - "Key=Name,Value=${var.appname}-${var.environment}-${var.subsystem}-${var.tier} (${var.USER})"
+  - Key=AppName,Value=${var.appname}
+  - Key=Environment,Value=${var.environment}
+  - Key=Subsystem,Value=${var.subsystem}
+  - Key=Tier,Value=${var.tier}
+  - Key=Contact,Value=${var.USER}
+
+- aws.ec2.modify-subnet-attribute.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_0}:
+  - --subnet-id
+  - ${aws.ec2.create-subnet.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_0}.Subnet.SubnetId}
+  - --map-public-ip-on-launch
+
+- aws.ec2.modify-subnet-attribute.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_1}:
+  - --subnet-id
+  - ${aws.ec2.create-subnet.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_1}.Subnet.SubnetId}
+  - --map-public-ip-on-launch
+
+- aws.ec2.create-route-table.${var.environment}-${var.subsystem}-${var.tier}:
+  - --vpc-id
+  - ${aws.ec2.create-vpc.main.Vpc.VpcId}
+
+- aws.ec2.create-tags.route-table-${var.environment}-${var.subsystem}-${var.tier}:
+  - --resources
+  - ${aws.ec2.create-route-table.${var.environment}-${var.subsystem}-${var.tier}.RouteTable.RouteTableId}
+  - --tags
+  - "Key=Name,Value=${var.appname}-${var.environment}-${var.subsystem}-${var.tier} (${var.USER})"
+  - Key=AppName,Value=${var.appname}
+  - Key=Environment,Value=${var.environment}
+  - Key=Subsystem,Value=${var.subsystem}
+  - Key=Tier,Value=${var.tier}
+  - Key=Contact,Value=${var.USER}
+
+- aws.ec2.associate-route-table.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_0}:
+  - --subnet-id
+  - ${aws.ec2.create-subnet.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_0}.Subnet.SubnetId}
+  - --route-table-id
+  - ${aws.ec2.create-route-table.${var.environment}-${var.subsystem}-${var.tier}.RouteTable.RouteTableId}
+
+- aws.ec2.associate-route-table.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_1}:
+  - --subnet-id
+  - ${aws.ec2.create-subnet.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_1}.Subnet.SubnetId}
+  - --route-table-id
+  - ${aws.ec2.create-route-table.${var.environment}-${var.subsystem}-${var.tier}.RouteTable.RouteTableId}
+
+- aws.ec2.create-route.internet-gateway-${var.environment}-${var.subsystem}-${var.tier}:
+  - --route-table-id
+  - ${aws.ec2.create-route-table.${var.environment}-${var.subsystem}-${var.tier}.RouteTable.RouteTableId}
+  - --destination-cidr-block
+  - 0.0.0.0/0
+  - --gateway-id
+  - ${aws.ec2.create-internet-gateway.main.InternetGateway.InternetGatewayId}
+
+- aws.ec2.create-vpc-endpoint.${var.environment}-${var.subsystem}-${var.tier}:
+  - --vpc-id
+  - ${aws.ec2.create-vpc.main.Vpc.VpcId}
+  - --service-name
+  - com.amazonaws.${var.region}.s3
+  - --route-table-ids
+  - ${aws.ec2.create-route-table.${var.environment}-${var.subsystem}-${var.tier}.RouteTable.RouteTableId}
+
+- aws.ec2.create-flow-logs.${var.environment}-${var.subsystem}-${var.tier}:
+  - --resource-ids
+  - ${aws.ec2.create-subnet.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_0}.Subnet.SubnetId}
+  - ${aws.ec2.create-subnet.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_1}.Subnet.SubnetId}
+  - --resource-type
+  - Subnet
+  - --traffic-type
+  - ALL
+  - --log-group-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}
+  - --deliver-logs-permission-arn
+  - ${aws.iam.create-role.${var.appname}-vpc-flow-log-role.Role.Arn}
+
+- aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-app:
+  - --group-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-app
+  - --description
+  - App security group for the ${var.appname}-${var.environment}-${var.subsystem}-${var.tier} tier.
+  - --vpc-id
+  - ${aws.ec2.create-vpc.main.Vpc.VpcId}
+
+- aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-s3:
+  - --group-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-s3
+  - --description
+  - S3 security group for the ${var.appname}-${var.environment}-${var.subsystem}-${var.tier} tier.
+  - --vpc-id
+  - ${aws.ec2.create-vpc.main.Vpc.VpcId}
+
+- aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-elb:
+  - --group-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-elb
+  - --description
+  - ELB security group for the ${var.appname}-${var.environment}-${var.subsystem}-${var.tier} tier.
+  - --vpc-id
+  - ${aws.ec2.create-vpc.main.Vpc.VpcId}
+
+- aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-acl1:
+  - --group-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-acl1
+  - --description
+  - ACL-1 security group for the ${var.appname}-${var.environment}-${var.subsystem}-${var.tier} tier.
+  - --vpc-id
+  - ${aws.ec2.create-vpc.main.Vpc.VpcId}
+
+- aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-acl2:
+  - --group-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-acl2
+  - --description
+  - ACL-2 security group for the ${var.appname}-${var.environment}-${var.subsystem}-${var.tier} tier.
+  - --vpc-id
+  - ${aws.ec2.create-vpc.main.Vpc.VpcId}
+
+- aws.ec2.create-tags.security-group-${var.environment}-${var.subsystem}-${var.tier}-app:
+  - --resources
+  - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-app.GroupId}
+  - --tags
+  - "Key=Name,Value=app ${var.appname}-${var.environment}-${var.subsystem}-${var.tier} (${var.USER})"
+  - Key=AppName,Value=${var.appname}
+  - Key=Environment,Value=${var.environment}
+  - Key=Subsystem,Value=${var.subsystem}
+  - Key=Tier,Value=${var.tier}
+  - Key=Purpose,Value=app
+  - Key=Contact,Value=${var.USER}
+
+- aws.ec2.create-tags.security-group-${var.environment}-${var.subsystem}-${var.tier}-s3:
+  - --resources
+  - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-s3.GroupId}
+  - --tags
+  - "Key=Name,Value=s3 ${var.appname}-${var.environment}-${var.subsystem}-${var.tier} (${var.USER})"
+  - Key=AppName,Value=${var.appname}
+  - Key=Environment,Value=${var.environment}
+  - Key=Subsystem,Value=${var.subsystem}
+  - Key=Tier,Value=${var.tier}
+  - Key=Purpose,Value=s3
+  - Key=Contact,Value=${var.USER}
+
+- aws.ec2.create-tags.security-group-${var.environment}-${var.subsystem}-${var.tier}-elb:
+  - --resources
+  - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-elb.GroupId}
+  - --tags
+  - "Key=Name,Value=elb ${var.appname}-${var.environment}-${var.subsystem}-${var.tier} (${var.USER})"
+  - Key=AppName,Value=${var.appname}
+  - Key=Environment,Value=${var.environment}
+  - Key=Subsystem,Value=${var.subsystem}
+  - Key=Tier,Value=${var.tier}
+  - Key=Purpose,Value=elb
+  - Key=Contact,Value=${var.USER}
+
+- aws.ec2.create-tags.security-group-${var.environment}-${var.subsystem}-${var.tier}-acl1:
+  - --resources
+  - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-acl1.GroupId}
+  - --tags
+  - "Key=Name,Value=acl1 ${var.appname}-${var.environment}-${var.subsystem}-${var.tier} (${var.USER})"
+  - Key=AppName,Value=${var.appname}
+  - Key=Environment,Value=${var.environment}
+  - Key=Subsystem,Value=${var.subsystem}
+  - Key=Tier,Value=${var.tier}
+  - Key=Purpose,Value=acl1
+  - Key=Contact,Value=${var.USER}
+
+- aws.ec2.create-tags.security-group-${var.environment}-${var.subsystem}-${var.tier}-acl2:
+  - --resources
+  - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-acl2.GroupId}
+  - --tags
+  - "Key=Name,Value=acl2 ${var.appname}-${var.environment}-${var.subsystem}-${var.tier} (${var.USER})"
+  - Key=AppName,Value=${var.appname}
+  - Key=Environment,Value=${var.environment}
+  - Key=Subsystem,Value=${var.subsystem}
+  - Key=Tier,Value=${var.tier}
+  - Key=Purpose,Value=acl2
+  - Key=Contact,Value=${var.USER}
+
+- aws.ec2.revoke-security-group-egress.${var.environment}-${var.subsystem}-${var.tier}-app:
+  - --group-id
+  - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-app.GroupId}
+  - --protocol
+  - '-1'
+  - --cidr
+  - 0.0.0.0/0
+
+- aws.ec2.revoke-security-group-egress.${var.environment}-${var.subsystem}-${var.tier}-s3:
+  - --group-id
+  - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-s3.GroupId}
+  - --protocol
+  - '-1'
+  - --cidr
+  - 0.0.0.0/0
+
+- aws.ec2.revoke-security-group-egress.${var.environment}-${var.subsystem}-${var.tier}-elb:
+  - --group-id
+  - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-elb.GroupId}
+  - --protocol
+  - '-1'
+  - --cidr
+  - 0.0.0.0/0
+
+- aws.ec2.revoke-security-group-egress.${var.environment}-${var.subsystem}-${var.tier}-acl1:
+  - --group-id
+  - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-acl1.GroupId}
+  - --protocol
+  - '-1'
+  - --cidr
+  - 0.0.0.0/0
+
+- aws.ec2.revoke-security-group-egress.${var.environment}-${var.subsystem}-${var.tier}-acl2:
+  - --group-id
+  - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-acl2.GroupId}
+  - --protocol
+  - '-1'
+  - --cidr
+  - 0.0.0.0/0
+
+- aws.elb.create-load-balancer.${var.environment}-${var.subsystem}-${var.tier}-0:
+  - --load-balancer-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-0
+  - --listeners
+  - Protocol=${var.elb-0-listener-0-protocol},LoadBalancerPort=${var.elb-0-listener-0-port},InstanceProtocol=${var.elb-0-instance-0-protocol},InstancePort=${var.elb-0-instance-0-port}
+  - --subnets
+  - ${aws.ec2.create-subnet.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_0}.Subnet.SubnetId}
+  - ${aws.ec2.create-subnet.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_1}.Subnet.SubnetId}
+  - --security-groups
+  - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-elb.GroupId}
+  - --scheme
+  - ${var.elb-0-scheme}
+  - --tags
+  - "Key=Name,Value=${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-${var.elb-0-scheme} ${var.USER}"
+  - Key=AppName,Value=${var.appname}
+  - Key=Environment,Value=${var.environment}
+  - Key=Subsystem,Value=${var.subsystem}
+  - Key=Tier,Value=${var.tier}
+  - Key=Contact,Value=${var.USER}
+
+- aws.elb.modify-load-balancer-attributes.${var.environment}-${var.subsystem}-${var.tier}-0:
+  - --load-balancer-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-0
+  - --load-balancer-attributes
+  - "CrossZoneLoadBalancing={Enabled=true},ConnectionDraining={Enabled=True,Timeout=${var.elb-0-connection-draining-timeout}},ConnectionSettings={IdleTimeout=${var.elb-0-idle-timeout}}"
+
+- aws.elb.configure-health-check.${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-0:
+  - --load-balancer-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-0
+  - --health-check
+  - "Target=${var.elb-0-healthcheck-url},Interval=${var.elb-0-healthcheck-interval},UnhealthyThreshold=${var.elb-0-healthcheck-unhealthy-threshold},HealthyThreshold=${var.elb-0-healthcheck-healthy-threshold},Timeout=${var.elb-0-healthcheck-timeout}"
+
+- aws.ec2.describe-images.${var.environment}-${var.subsystem}-${var.tier}:
+  - --owners
+  - ${var.image-owner}
+  - --filters
+  - "Name=name,Values='${var.image-name}'"
+
+- aws.iam.create-role.${var.environment}-${var.subsystem}-${var.tier}:
+  - --role-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}
+  - --assume-role-policy-document
+  - |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "ec2.amazonaws.com"
+          },
+          "Action": "sts:AssumeRole"
+        }
+      ]
+    }
+
+- aws.iam.put-role-policy.${var.environment}-${var.subsystem}-${var.tier}:
+  - --role-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}
+  - --policy-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}
+  - --policy-document
+  - ${var.instance-role-policy}
+
+- aws.iam.create-instance-profile.${var.environment}-${var.subsystem}-${var.tier}:
+  - --instance-profile-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}
+
+- aws.iam.add-role-to-instance-profile.${var.environment}-${var.subsystem}-${var.tier}:
+  - --instance-profile-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}
+  - --role-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}
+
+# Create asg using stub lc, then switch to the versioned lc
+- aws.autoscaling.create-launch-configuration.${var.environment}-${var.subsystem}-${var.tier}-stub:
+  - --launch-configuration-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-stub
+  - --image-id
+  - ${aws.ec2.describe-images.${var.environment}-${var.subsystem}-${var.tier}.Images.0.ImageId}
+  - --key-name
+  - ${var.ssh-key-name}
+  - --security-groups
+  - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-app.GroupId}
+  - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-s3.GroupId}
+  - --user-data
+  - ${var.user-data}
+  - --instance-type
+  - ${var.instance-type}
+  - --block-device-mappings
+  - '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":${var.root-volume-size}}}]'
+  - --iam-instance-profile
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}
+
+- aws.autoscaling.create-launch-configuration.${var.environment}-${var.subsystem}-${var.tier}-blue-${var.blue-lc-version}:
+  - --launch-configuration-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-blue-${var.blue-lc-version}
+  - --image-id
+  - ${aws.ec2.describe-images.${var.environment}-${var.subsystem}-${var.tier}.Images.0.ImageId}
+  - --key-name
+  - ${var.ssh-key-name}
+  - --security-groups
+  - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-app.GroupId}
+  - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-s3.GroupId}
+  - --user-data
+  - ${var.user-data}
+  - --instance-type
+  - ${var.instance-type}
+  - --block-device-mappings
+  - '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":${var.root-volume-size}}}]'
+  - --iam-instance-profile
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}
+
+- aws.autoscaling.create-launch-configuration.${var.environment}-${var.subsystem}-${var.tier}-green-${var.green-lc-version}:
+  - --launch-configuration-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-green-${var.green-lc-version}
+  - --image-id
+  - ${aws.ec2.describe-images.${var.environment}-${var.subsystem}-${var.tier}.Images.0.ImageId}
+  - --key-name
+  - ${var.ssh-key-name}
+  - --security-groups
+  - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-app.GroupId}
+  - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-s3.GroupId}
+  - --user-data
+  - ${var.user-data}
+  - --instance-type
+  - ${var.instance-type}
+  - --block-device-mappings
+  - '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":${var.root-volume-size}}}]'
+  - --iam-instance-profile
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}
+
+- aws.autoscaling.create-auto-scaling-group.${var.environment}-${var.subsystem}-${var.tier}-blue:
+  - --auto-scaling-group-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-blue
+  - --launch-configuration-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-stub
+  - --min-size
+  - ${var.blue-scale-min}
+  - --desired-capacity
+  - ${var.blue-scale-desired}
+  - --max-size
+  - ${var.blue-scale-max}
+  - --availability-zones
+  - ${var.region}${var.az_letter_0}
+  - ${var.region}${var.az_letter_1}
+  - --vpc-zone-identifier
+  - ${aws.ec2.create-subnet.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_0}.Subnet.SubnetId},${aws.ec2.create-subnet.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_1}.Subnet.SubnetId}
+  - --health-check-type
+  - ELB
+  - --health-check-grace-period
+  - ${var.grace-period}
+  - --default-cooldown
+  - ${var.cooldown}
+  - --load-balancer-names
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-0
+  - --tags
+  - "ResourceId=${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-blue,ResourceType=auto-scaling-group,Key=AppName,Value=${var.appname},PropagateAtLaunch=true"
+  - "ResourceId=${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-blue,ResourceType=auto-scaling-group,Key=Environment,Value=${var.environment},PropagateAtLaunch=true"
+  - "ResourceId=${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-blue,ResourceType=auto-scaling-group,Key=Subsystem,Value=${var.subsystem},PropagateAtLaunch=true"
+  - "ResourceId=${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-blue,ResourceType=auto-scaling-group,Key=Tier,Value=${var.tier},PropagateAtLaunch=true"
+  - "ResourceId=${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-blue,ResourceType=auto-scaling-group,Key=Pool,Value=blue,PropagateAtLaunch=true"
+  - "ResourceId=${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-blue,ResourceType=auto-scaling-group,Key=Name,Value=${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-blue,PropagateAtLaunch=true"
+  - "ResourceId=${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-blue,ResourceType=auto-scaling-group,Key=Contact,Value=${var.USER},PropagateAtLaunch=true"
+
+- aws.autoscaling.create-auto-scaling-group.${var.environment}-${var.subsystem}-${var.tier}-green:
+  - --auto-scaling-group-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-green
+  - --launch-configuration-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-stub
+  - --min-size
+  - ${var.green-scale-min}
+  - --desired-capacity
+  - ${var.green-scale-desired}
+  - --max-size
+  - ${var.green-scale-max}
+  - --availability-zones
+  - ${var.region}${var.az_letter_0}
+  - ${var.region}${var.az_letter_1}
+  - --vpc-zone-identifier
+  - ${aws.ec2.create-subnet.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_0}.Subnet.SubnetId},${aws.ec2.create-subnet.${var.environment}-${var.subsystem}-${var.tier}-${var.az_letter_1}.Subnet.SubnetId}
+  - --health-check-type
+  - ELB
+  - --health-check-grace-period
+  - ${var.grace-period}
+  - --default-cooldown
+  - ${var.cooldown}
+  - --load-balancer-names
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-0
+  - --tags
+  - "ResourceId=${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-green,ResourceType=auto-scaling-group,Key=AppName,Value=${var.appname},PropagateAtLaunch=true"
+  - "ResourceId=${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-green,ResourceType=auto-scaling-group,Key=Environment,Value=${var.environment},PropagateAtLaunch=true"
+  - "ResourceId=${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-green,ResourceType=auto-scaling-group,Key=Subsystem,Value=${var.subsystem},PropagateAtLaunch=true"
+  - "ResourceId=${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-green,ResourceType=auto-scaling-group,Key=Tier,Value=${var.tier},PropagateAtLaunch=true"
+  - "ResourceId=${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-green,ResourceType=auto-scaling-group,Key=Pool,Value=green,PropagateAtLaunch=true"
+  - "ResourceId=${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-green,ResourceType=auto-scaling-group,Key=Name,Value=${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-green,PropagateAtLaunch=true"
+  - "ResourceId=${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-green,ResourceType=auto-scaling-group,Key=Contact,Value=${var.USER},PropagateAtLaunch=true"
+
+- aws.autoscaling.update-auto-scaling-group.${var.environment}-${var.subsystem}-${var.tier}-blue-${var.blue-lc-version}:
+  - --auto-scaling-group-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-blue
+  - --launch-configuration-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-blue-${var.blue-lc-version}
+  - --min-size
+  - ${var.blue-scale-min}
+  - --max-size
+  - ${var.blue-scale-max}
+  - --desired-capacity
+  - ${var.blue-scale-desired}
+  - --default-cooldown
+  - ${var.cooldown}
+  - --health-check-grace-period
+  - ${var.grace-period}
+
+- aws.autoscaling.update-auto-scaling-group.${var.environment}-${var.subsystem}-${var.tier}-green-${var.green-lc-version}:
+  - --auto-scaling-group-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-green
+  - --launch-configuration-name
+  - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-green-${var.green-lc-version}
+  - --min-size
+  - ${var.green-scale-min}
+  - --max-size
+  - ${var.green-scale-max}
+  - --desired-capacity
+  - ${var.green-scale-desired}
+  - --default-cooldown
+  - ${var.cooldown}
+  - --health-check-grace-period
+  - ${var.grace-period}
+

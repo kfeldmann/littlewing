@@ -1,0 +1,71 @@
+# Required vars
+#   var.vpc-cidr
+#   var.appname
+
+steps:
+
+- aws.ec2.create-vpc.main:
+  - --cidr-block
+  - ${var.vpc-cidr}
+
+- aws.ec2.create-tags.vpc:
+  - --resources
+  - ${aws.ec2.create-vpc.main.Vpc.VpcId}
+  - --tags
+  - "Key=Name,Value=${var.appname} (${var.USER})"
+  - Key=AppName,Value=${var.appname}
+  - Key=Contact,Value=${var.USER}
+
+- aws.ec2.create-internet-gateway.main: null
+
+- aws.ec2.create-tags.internet-gateway:
+  - --resources
+  - ${aws.ec2.create-internet-gateway.main.InternetGateway.InternetGatewayId}
+  - --tags
+  - "Key=Name,Value=${var.appname} (${var.USER})"
+  - Key=AppName,Value=${var.appname}
+  - Key=Contact,Value=${var.USER}
+
+- aws.ec2.attach-internet-gateway.main:
+  - --internet-gateway-id
+  - ${aws.ec2.create-internet-gateway.main.InternetGateway.InternetGatewayId}
+  - --vpc-id
+  - ${aws.ec2.create-vpc.main.Vpc.VpcId}
+
+# Role for flow logging
+- aws.iam.create-role.${var.appname}-vpc-flow-log-role:
+  - --role-name
+  - ${var.appname}-vpc-flow-log-role
+  - --assume-role-policy-document
+  - |
+    {"Version":"2012-10-17","Statement":[{"Sid":"","Effect":"Allow","Principal":{"Service":"vpc-flow-logs.amazonaws.com"},"Action":"sts:AssumeRole"}]}
+
+- aws.iam.put-role-policy.${var.appname}-vpc-flow-log-policy:
+  - --role-name
+  - ${var.appname}-vpc-flow-log-role
+  - --policy-name
+  - ${var.appname}-vpc-flow-log-policy
+  - --policy-document
+  - |
+    {"Version":"2012-10-17","Statement":[{"Action":["logs:CreateLogGroup","logs:CreateLogStream","logs:PutLogEvents","logs:DescribeLogGroups","logs:DescribeLogStreams"],"Effect":"Allow","Resource":"*"}]}
+
+# Tag the default Network ACL as the "Blacklist" ACL
+# (to be used to block attackers)
+- aws.ec2.describe-network-acls.blacklist-acl:
+  - --filters
+  - Name=default,Values=true
+  - Name=vpc-id,Values=${aws.ec2.create-vpc.main.Vpc.VpcId}
+
+- aws.ec2.create-tags.blacklist-acl:
+  - --resources
+  - ${aws.ec2.describe-network-acls.blacklist-acl.NetworkAcls.0.NetworkAclId}
+  - --tags
+  - "Key=Name,Value=blacklist - ${var.appname} (${var.USER})"
+  - Key=AppName,Value=${var.appname}
+  - Key=Purpose,Value=blacklist
+  - Key=Contact,Value=${var.USER}
+
+
+# Put VPC peering here
+# Use "- profile:" to switch to the peer account to do the approval,
+# return routes, then switch back to the main profile again.
