@@ -15,31 +15,49 @@ var.elb-0-listener-0-protocol: http # (tcp|ssl|http|https)
 var.elb-0-instance-0-port: 80
 var.elb-0-instance-0-protocol: http # (tcp|ssl|http|https)
 
-var.blue-lc-version: 201607101606
-var.blue-scale-min: 1
-var.blue-scale-desired: 1
-var.blue-scale-max: 1
-var.green-lc-version: 201607101606
+var.blue-lc-version: 201607130652
+var.blue-scale-min: 2
+var.blue-scale-desired: 2
+var.blue-scale-max: 2
+var.green-lc-version: 201607130652
 var.green-scale-min: 0
 var.green-scale-desired: 0
 var.green-scale-max: 0
 
-var.image-owner: amazon
-var.image-name: amzn-ami-minimal-hvm-2016.03.0.x86_64-ebs
-var.root-volume-size: 2 # GB
-var.grace-period: 300
-var.cooldown: 300
-var.user-data: |
+var.blue-image-owner: amazon
+var.blue-image-name: amzn-ami-minimal-hvm-2016.03.0.x86_64-ebs
+var.blue-instance-type: t2.nano
+var.blue-root-volume-size: 2 # GB
+var.blue-grace-period: 300
+var.blue-cooldown: 300
+var.blue-user-data: |
   #cloud-config
   packages:
   - httpd24
   write_files:
   - path: /var/www/html/index.html
     permissions: '0444'
-    content: Hello world.
+    content: Hello from the blue pool.
   runcmd:
   - /sbin/service httpd start
-var.instance-type: t2.nano
+
+var.green-image-owner: amazon
+var.green-image-name: amzn-ami-minimal-hvm-2016.03.0.x86_64-ebs
+var.green-instance-type: t2.nano
+var.green-root-volume-size: 2 # GB
+var.green-grace-period: 300
+var.green-cooldown: 300
+var.green-user-data: |
+  #cloud-config
+  packages:
+  - httpd24
+  write_files:
+  - path: /var/www/html/index.html
+    permissions: '0444'
+    content: Hello from the green pool.
+  runcmd:
+  - /sbin/service httpd start
+
 var.instance-role-policy: |
   {
     "Version": "2012-10-17",

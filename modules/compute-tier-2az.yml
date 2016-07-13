@@ -24,21 +24,28 @@
 #   var.elb-0-instance-0-protocol
 #   var.blue-lc-version
 #   var.green-lc-version
-#   var.image-owner
-#   var.image-name
-#   var.root-volume-size
-#   var.ssh-key-name
-#   var.user-data
-#   var.instance-type
-#   var.instance-role-policy
+#   var.blue-image-owner
+#   var.green-image-owner
+#   var.blue-image-name
+#   var.green-image-name
+#   var.blue-root-volume-size
+#   var.green-root-volume-size
+#   var.blue-user-data
+#   var.green-user-data
+#   var.blue-instance-type
+#   var.green-instance-type
 #   var.blue-scale-min
-#   var.blue-scale-desired
-#   var.blue-scale-max
 #   var.green-scale-min
+#   var.blue-scale-desired
 #   var.green-scale-desired
+#   var.blue-scale-max
 #   var.green-scale-max
-#   var.grace-period
-#   var.cooldown
+#   var.blue-grace-period
+#   var.green-grace-period
+#   var.blue-cooldown
+#   var.green-cooldown
+#   var.instance-role-policy
+#   var.ssh-key-name
 
 
 steps:
@@ -309,11 +316,17 @@ steps:
   - --health-check
   - "Target=${var.elb-0-healthcheck-url},Interval=${var.elb-0-healthcheck-interval},UnhealthyThreshold=${var.elb-0-healthcheck-unhealthy-threshold},HealthyThreshold=${var.elb-0-healthcheck-healthy-threshold},Timeout=${var.elb-0-healthcheck-timeout}"
 
-- aws.ec2.describe-images.${var.environment}-${var.subsystem}-${var.tier}:
+- aws.ec2.describe-images.${var.environment}-${var.subsystem}-${var.tier}-${var.blue-lc-version}:
   - --owners
-  - ${var.image-owner}
+  - ${var.blue-image-owner}
   - --filters
-  - "Name=name,Values='${var.image-name}'"
+  - "Name=name,Values='${var.blue-image-name}'"
+
+- aws.ec2.describe-images.${var.environment}-${var.subsystem}-${var.tier}-${var.green-lc-version}:
+  - --owners
+  - ${var.green-image-owner}
+  - --filters
+  - "Name=name,Values='${var.green-image-name}'"
 
 - aws.iam.create-role.${var.environment}-${var.subsystem}-${var.tier}:
   - --role-name
@@ -356,18 +369,18 @@ steps:
   - --launch-configuration-name
   - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-stub
   - --image-id
-  - ${aws.ec2.describe-images.${var.environment}-${var.subsystem}-${var.tier}.Images.0.ImageId}
+  - ${aws.ec2.describe-images.${var.environment}-${var.subsystem}-${var.tier}-${var.blue-lc-version}.Images.0.ImageId}
   - --key-name
   - ${var.ssh-key-name}
   - --security-groups
   - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-app.GroupId}
   - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-s3.GroupId}
   - --user-data
-  - ${var.user-data}
+  - ${var.blue-user-data}
   - --instance-type
-  - ${var.instance-type}
+  - ${var.blue-instance-type}
   - --block-device-mappings
-  - '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":${var.root-volume-size}}}]'
+  - '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":${var.blue-root-volume-size}}}]'
   - --iam-instance-profile
   - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}
 
@@ -375,18 +388,18 @@ steps:
   - --launch-configuration-name
   - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-blue-${var.blue-lc-version}
   - --image-id
-  - ${aws.ec2.describe-images.${var.environment}-${var.subsystem}-${var.tier}.Images.0.ImageId}
+  - ${aws.ec2.describe-images.${var.environment}-${var.subsystem}-${var.tier}-${var.blue-lc-version}.Images.0.ImageId}
   - --key-name
   - ${var.ssh-key-name}
   - --security-groups
   - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-app.GroupId}
   - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-s3.GroupId}
   - --user-data
-  - ${var.user-data}
+  - ${var.blue-user-data}
   - --instance-type
-  - ${var.instance-type}
+  - ${var.blue-instance-type}
   - --block-device-mappings
-  - '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":${var.root-volume-size}}}]'
+  - '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":${var.blue-root-volume-size}}}]'
   - --iam-instance-profile
   - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}
 
@@ -394,18 +407,18 @@ steps:
   - --launch-configuration-name
   - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-green-${var.green-lc-version}
   - --image-id
-  - ${aws.ec2.describe-images.${var.environment}-${var.subsystem}-${var.tier}.Images.0.ImageId}
+  - ${aws.ec2.describe-images.${var.environment}-${var.subsystem}-${var.tier}-${var.green-lc-version}.Images.0.ImageId}
   - --key-name
   - ${var.ssh-key-name}
   - --security-groups
   - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-app.GroupId}
   - ${aws.ec2.create-security-group.${var.environment}-${var.subsystem}-${var.tier}-s3.GroupId}
   - --user-data
-  - ${var.user-data}
+  - ${var.green-user-data}
   - --instance-type
-  - ${var.instance-type}
+  - ${var.green-instance-type}
   - --block-device-mappings
-  - '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":${var.root-volume-size}}}]'
+  - '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":${var.green-root-volume-size}}}]'
   - --iam-instance-profile
   - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}
 
@@ -428,9 +441,9 @@ steps:
   - --health-check-type
   - ELB
   - --health-check-grace-period
-  - ${var.grace-period}
+  - ${var.blue-grace-period}
   - --default-cooldown
-  - ${var.cooldown}
+  - ${var.blue-cooldown}
   - --load-balancer-names
   - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-0
   - --tags
@@ -461,9 +474,9 @@ steps:
   - --health-check-type
   - ELB
   - --health-check-grace-period
-  - ${var.grace-period}
+  - ${var.green-grace-period}
   - --default-cooldown
-  - ${var.cooldown}
+  - ${var.green-cooldown}
   - --load-balancer-names
   - ${var.appname}-${var.environment}-${var.subsystem}-${var.tier}-0
   - --tags
@@ -487,9 +500,9 @@ steps:
   - --desired-capacity
   - ${var.blue-scale-desired}
   - --default-cooldown
-  - ${var.cooldown}
+  - ${var.blue-cooldown}
   - --health-check-grace-period
-  - ${var.grace-period}
+  - ${var.blue-grace-period}
 
 - aws.autoscaling.update-auto-scaling-group.${var.environment}-${var.subsystem}-${var.tier}-green-${var.green-lc-version}:
   - --auto-scaling-group-name
@@ -503,7 +516,7 @@ steps:
   - --desired-capacity
   - ${var.green-scale-desired}
   - --default-cooldown
-  - ${var.cooldown}
+  - ${var.green-cooldown}
   - --health-check-grace-period
-  - ${var.grace-period}
+  - ${var.green-grace-period}
 

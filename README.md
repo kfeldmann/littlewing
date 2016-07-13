@@ -186,6 +186,13 @@ create app-level networking pieces, and tier-level networking pieces. Notice
 how the sample app defines variables for each in fairly small files, then
 symlinks in the larger module files to do the heavy lifting.
 
+At least once per application configuration, usually in one of the first files,
+you should set the profile and region to be used by aws cli. This is done with
+the keywords "profile:" and "region:". The values can be set using either
+variables or strings. It is also possible to change profiles throughout your
+configuration, for example to accept a peering connection request in another
+account.
+
 To make changes in a production setting, take a look at the strategy
 used in the blue/green pools of the sample app's web tier. By versioning
 the names of steps that _update_ infrastructure, you can change the config,
