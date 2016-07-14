@@ -1,0 +1,2 @@
+steps:
+- print: "URL: http://${aws.elb.create-load-balancer.dev-website-web-0.DNSName}/"
