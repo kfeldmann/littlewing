@@ -10,9 +10,11 @@ import subprocess
 awscli = os.environ.get('AWSCLI', '/usr/bin/aws')
 filename = '(none)'
 lineno = '(none)'
+stepno = '(none)'
 
 def e(message):
-    sys.stderr.write('ERROR: %s on line %s\n' % (filename, lineno))
+    sys.stderr.write('ERROR: file: %s, step: %s, line: %s\n' \
+                    % (filename, stepno, lineno))
     sys.stderr.write('ERROR: %s\n' % message)
     raise SystemExit, 1
 
@@ -100,7 +102,8 @@ def call_by_args(region, profile, cmdtuple, argtuple):
     try:
         outdata = subprocess.check_output(args)
     except Exception as ex:
-        e('Failed to run %s %s %s: %s' % (awscli, cmdtuple[0], cmdtuple[1], ex))
+        e('Failed to run %s %s %s: %s' \
+         % (awscli, cmdtuple[0], cmdtuple[1], ex))
     if outdata: # Some calls do not return data
         try:
             outdict = json.loads(outdata)
@@ -168,7 +171,7 @@ var['USER'] = os.environ.get('USER', 'terraflop')
 for in_file in input_files:
     f = open(in_file, 'r')
     filename = in_file
-    lineno = '(unknown yaml)'
+    lineno = '(yaml)'
     yd = yaml.load(f)
     f.close()
     # Have to make sure we load all the vars before the steps
@@ -183,10 +186,20 @@ for in_file in input_files:
                 var[k[4:]] = yd[k]
     for k in yd.keys():
         if k == 'steps':
+            stepno = 0
             for step in yd[k]:
+                stepno += 1
                 step_key = step.keys()[0]
                 lineno = '(%s)' % step_key
                 rsrc_pathname = varsub(step_key)
+                if rsrc_pathname == 'print':
+                    if type(step[step_key]) == type('a'):
+                        print varsub(step[step_key])
+                    else:
+                        w('%s %s' \
+                         % ('Print statements can only use string',
+                           'arguments (with or without variables).'))
+                    continue
                 if rsrc_pathname == 'region':
                     region = varsub(step[step_key])
                     continue
@@ -199,15 +212,18 @@ for in_file in input_files:
                     else:
                         var[k[4:]] = yd[k]
                     continue
-                if os.path.exists('.terraflop-output/%s' % rsrc_pathname):
-                    info('%s has already been run.' % rsrc_pathname)
+                if os.path.exists('.terraflop-output/%s' \
+                                 % rsrc_pathname):
+                    d('%s has already been run.' % rsrc_pathname)
                     continue
                 words = rsrc_pathname.split('.')
                 if words[0] == 'aws':
                     cmdtuple = (words[1], words[2])
                     argtupleraw = step[step_key]
                     info('Running %s' % rsrc_pathname)
-                    outdict = call_by_args(region, profile, cmdtuple, varsub_tuple(argtupleraw))
+                    outdict = call_by_args(
+                        region, profile, cmdtuple,
+                        varsub_tuple(argtupleraw))
                     store_output(rsrc_pathname, outdict)
                 else:
                     e('Unrecognized provider: %s' % words[0])
