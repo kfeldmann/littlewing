@@ -1,0 +1,16 @@
+steps:
+
+# To cause any step to run every time flop runs, prepend it's
+# step key with a + character.
+# 
+# The 'exec' provider executes arbitrary commands on your
+# local system. The format is:
+# 
+#     exec.COMMAND.NAME:
+#     - ARG
+#     - ...
+
+- +exec.ls.one:
+  - '-ltr'
+  - '.'
+

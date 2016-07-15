@@ -119,7 +119,7 @@ def aws_call(region, profile, cmdtuple, argtuple):
         outdict = None
     return outdict
 
-def shell_call(cmd, argtuple):
+def exec_call(cmd, argtuple):
     args = [cmd]
     args.extend(argtuple)
     try:
@@ -237,11 +237,11 @@ for in_file in input_files:
                         region, profile, cmdtuple,
                         varsub_tuple(argtupleraw))
                     store_output(rsrc_pathname, outdict)
-                elif words[0] == 'shell':
+                elif words[0] == 'exec':
                     cmd = words[1]
                     argtupleraw = step[step_key]
                     info('Running %s' % rsrc_pathname)
-                    outdict = shell_call(
+                    outdict = exec_call(
                         cmd, varsub_tuple(argtupleraw))
                     store_output(rsrc_pathname, outdict)
                 else:
