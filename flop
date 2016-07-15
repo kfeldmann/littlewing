@@ -226,7 +226,7 @@ for in_file in input_files:
                                  % rsrc_pathname):
                     d('%s has already been run.' % rsrc_pathname)
                     continue
-                if rsrc_pathname[0] == '!':
+                if rsrc_pathname[0] == '+':
                     rsrc_pathname = rsrc_pathname[1:]
                 words = rsrc_pathname.split('.')
                 if words[0] == 'aws':
