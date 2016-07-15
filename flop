@@ -6,6 +6,7 @@ import json
 import os
 import re
 import subprocess
+from urllib import quote, unquote
 
 awscli = os.environ.get('AWSCLI', '/usr/bin/aws')
 filename = '(none)'
@@ -66,7 +67,7 @@ def __varsub(in_str):
             e('Malformed line in output file (%s): %s' % (fname, line))
         if n == in_str:
             f.close()
-            return v
+            return unquote(v)
     f.close()
     e('Unknown resource attribute: %s' % in_str)
 
@@ -90,7 +91,7 @@ def varsub(val):
         i += 1
     return val
 
-def call_by_args(region, profile, cmdtuple, argtuple):
+def aws_call(region, profile, cmdtuple, argtuple):
     args = [ \
             awscli,
             '--region', region,
@@ -118,6 +119,15 @@ def call_by_args(region, profile, cmdtuple, argtuple):
         outdict = None
     return outdict
 
+def shell_call(cmd, argtuple):
+    args = [cmd]
+    args.extend(argtuple)
+    try:
+        outdata = subprocess.check_output(args)
+    except Exception as ex:
+        e('Failed to run %s: %s' % (cmd, ex))
+    return {'Output': outdata}
+
 def stringify(path, name, obj):
     strings = []
     if obj == None:
@@ -131,7 +141,7 @@ def stringify(path, name, obj):
             strings.extend(stringify('%s.%s' % (path, name), i, item))
             i += 1
     else:
-        this = '%s.%s:%s' % (path, name, str(obj))
+        this = '%s.%s:%s' % (path, name, quote(obj))
         strings.append(this.strip('.'))
     return strings
 
@@ -216,14 +226,23 @@ for in_file in input_files:
                                  % rsrc_pathname):
                     d('%s has already been run.' % rsrc_pathname)
                     continue
+                if rsrc_pathname[0] == '!':
+                    rsrc_pathname = rsrc_pathname[1:]
                 words = rsrc_pathname.split('.')
                 if words[0] == 'aws':
                     cmdtuple = (words[1], words[2])
                     argtupleraw = step[step_key]
                     info('Running %s' % rsrc_pathname)
-                    outdict = call_by_args(
+                    outdict = aws_call(
                         region, profile, cmdtuple,
                         varsub_tuple(argtupleraw))
+                    store_output(rsrc_pathname, outdict)
+                elif words[0] == 'shell':
+                    cmd = words[1]
+                    argtupleraw = step[step_key]
+                    info('Running %s' % rsrc_pathname)
+                    outdict = shell_call(
+                        cmd, varsub_tuple(argtupleraw))
                     store_output(rsrc_pathname, outdict)
                 else:
                     e('Unrecognized provider: %s' % words[0])
