@@ -1,5 +1,7 @@
 #!/usr/bin/python2.7 -O
 
+"Terraflop: Simple, powerful infrastructure automation."
+
 import sys
 import yaml
 import json
@@ -8,62 +10,77 @@ import re
 import subprocess
 from urllib import quote, unquote
 
-awscli = os.environ.get('AWSCLI', '/usr/bin/aws')
+AWSCLI = os.environ.get('AWSCLI', '/usr/bin/aws')
 filename = '(none)'
 lineno = '(none)'
 stepno = '(none)'
 
-def e(message):
+def _err(message):
+    """
+    Write error message to stderr along with filename,
+    stepno, and lineno, and then exit(1).
+    """
     sys.stderr.write('ERROR: file: %s, step: %s, line: %s\n' \
                     % (filename, stepno, lineno))
     sys.stderr.write('ERROR: %s\n' % message)
-    raise SystemExit, 1
+    raise SystemExit(1)
 
-def w(message):
+def _wrn(message):
+    """
+    Write warning message to stderr along with filename,
+    stepno, and lineno.
+    """
     sys.stderr.write('WARN: file: %s, step: %s, line: %s\n' \
                     % (filename, stepno, lineno))
     sys.stderr.write('WARN: %s\n' % message)
     return None
 
-def info(message):
+def _inf(message):
+    "Write informational message to stdout."
     sys.stdout.write('INFO: %s\n' % message)
     return None
 
-def d(message):
+def _dbg(message):
+    """
+    If the environment variable DEBUG has been set, write
+    debugging message to stdout.
+    """
     if os.environ.get('DEBUG', False):
         sys.stdout.write('DEBUG: %s\n' % message)
     return None
 
 def usage():
+    "Write usage statement to stderr and exit(2)."
     sys.stderr.write('Usage: flop [-l|--list|<target>]\n')
-    raise SystemExit(1)
+    raise SystemExit(2)
 
 def __varsub(in_str):
-    d('__varsub(): starting with in_str = %s' % in_str)
+    "Dereference variables and output references."
+    _dbg('__varsub(): starting with in_str = %s' % in_str)
     words = in_str.split('.')
-    d('__varsub(): words = %s' % repr(words))
+    _dbg('__varsub(): words = %s' % repr(words))
     if words[0] == 'var':
         if len(words) == 2:
             if words[1] in var:
                 return var[words[1]]
             else:
-                e('Unknown variable: %s' % words[1])
+                _err('Unknown variable: %s' % words[1])
         elif len(words) == 3:
             if words[1] in var:
                 return var[words[1]][words[2]]
             else:
-                e('Unknown variable: %s.%s' % (words[1], words[2]))
+                _err('Unknown variable: %s.%s' % (words[1], words[2]))
     if words[0] == 'aws':
         fname = '.'.join(words[:4])
     elif words[0] == 'exec':
         fname = '.'.join(words[:3])
     else:
-        e('Unknown provider: %s' % words[0])
+        _err('Unknown provider: %s' % words[0])
     try:
         f = open('.terraflop-output/%s' % fname, 'r')
         filename = '.terraflop-output/%s' % fname
     except IOError:
-        e('Unknown resource: %s' % fname)
+        _err('Unknown resource: %s' % fname)
     lineno = 0
     while True:
         line = f.readline()
@@ -75,18 +92,22 @@ def __varsub(in_str):
             n, v = line.split(':', 1)
         except ValueError:
             f.close()
-            e('Malformed line in output file (%s): %s' % (fname, line))
+            _err('Malformed line in output file (%s): %s' % (fname, line))
         if n == in_str:
             f.close()
             return unquote(v)
     f.close()
-    e('Unknown resource attribute: %s' % in_str)
+    _err('Unknown resource attribute: %s' % in_str)
 
 def varsub(val):
-    d('varsub(): starting with val = %s' % val)
-    if type(val) == type(None):
+    """
+    Recursively (to a limit) find variables in the input string
+    and call __varsub() to dereference them.
+    """
+    _dbg('varsub(): starting with val = %s' % val)
+    if isinstance(val, None.__class__):
         return val
-    if type(val) == type(0):
+    if isinstance(val, int):
         return str(val)
     i = 0
     while i < 10:
@@ -95,16 +116,17 @@ def varsub(val):
             s.group(1)
         except (IndexError, AttributeError):
             break
-        d('varsub(): s.group(0) = %s' % s.group(0))
-        d('varsub(): s.group(1) = %s' % s.group(1))
+        _dbg('varsub(): s.group(0) = %s' % s.group(0))
+        _dbg('varsub(): s.group(1) = %s' % s.group(1))
         needle = s.group(0).replace('$', r'\$')
         val = re.sub(needle, __varsub(s.group(1)), val)
         i += 1
     return val
 
 def aws_call(region, profile, cmdtuple, argtuple):
+    "Spawn aws-cli subprocess to execute commands."
     args = [ \
-            awscli,
+            AWSCLI,
             '--region', region,
             '--profile', profile,
            ]
@@ -114,39 +136,45 @@ def aws_call(region, profile, cmdtuple, argtuple):
     try:
         outdata = subprocess.check_output(args)
     except Exception as ex:
-        e('Failed to run %s %s %s: %s' \
-         % (awscli, cmdtuple[0], cmdtuple[1], ex))
+        _err('Failed to run %s %s %s: %s' \
+         % (AWSCLI, cmdtuple[0], cmdtuple[1], ex))
     if outdata: # Some calls do not return data
         try:
             outdict = json.loads(outdata)
         except Exception as ex:
-            e( \
+            _err( \
             """Failed to parse json response from %s %s %s.
             Exception is: %s
             JSON source:
             %s
-            """ % (awscli, cmdtuple[0], cmdtuple[1], ex, outdata))
+            """ % (AWSCLI, cmdtuple[0], cmdtuple[1], ex, outdata))
     else:
         outdict = None
     return outdict
 
 def exec_call(cmd, argtuple):
+    "Spawn subprocess to execute <cmd>."
     args = [cmd]
     args.extend(argtuple)
     try:
         outdata = subprocess.check_output(args)
     except Exception as ex:
-        e('Failed to run %s: %s' % (cmd, ex))
+        _err('Failed to run %s: %s' % (cmd, ex))
     return {'Output': outdata}
 
 def stringify(path, name, obj):
+    """
+    Recursively convert heirarchical object into a list of strings,
+    each using a dotted notation to represent the branch to each
+    attribute and its value.
+    """
     strings = []
     if obj == None:
         return strings
-    if type(obj) == type({}):
+    if isinstance(obj, dict):
         for k in obj.keys():
             strings.extend(stringify('%s.%s' % (path, name), k, obj[k]))
-    elif type(obj) == type([]):
+    elif isinstance(obj, list):
         i = 0
         for item in obj:
             strings.extend(stringify('%s.%s' % (path, name), i, item))
@@ -157,16 +185,18 @@ def stringify(path, name, obj):
     return strings
 
 def store_output(name, outdict):
+    "Stringify and write out the output data from a step."
     try:
         f = open('.terraflop-output/%s' % name, 'w')
     except IOError:
-        e('Failed to open output file: %s' % name)
+        _err('Failed to open output file: %s' % name)
     for line in stringify('', name, outdict):
         f.write('%s\n' % line)
     f.close()
     return None
 
 def varsub_tuple(intuple):
+    "Substitute variables in each element of a tuple."
     if intuple == None:
         return None
     outtuple = []
@@ -218,38 +248,38 @@ for in_file in input_files:
     for k in yd.keys():
         lineno = '(%s...)' % str(k)[:10]
         if k[:4] == 'var.':
-            if type(yd[k]) == type('a'):
+            if isinstance(yd[k], basestring):
                 var[k[4:]] = varsub(yd[k])
-            elif type(yd[k]) == type(0):
+            elif isinstance(yd[k], int):
                 var[k[4:]] = str(yd[k])
             else:
                 var[k[4:]] = yd[k]
         elif k == 'default-target':
             if not target:
-                if isinstance(yd[k], str):
+                if isinstance(yd[k], basestring):
                     target = varsub(yd[k])
                     if listing:
                         default_found = True
-                        info('Default target: %s' % target)
+                        _inf('Default target: %s' % target)
                 else:
-                    w('Default target must be a string.')
+                    _wrn('Default target must be a string.')
     for k in yd.keys():
         if k[:5] == 'steps':
             if listing:
                 if k[6:]:
-                    info(k[6:])
+                    _inf(k[6:])
                 else:
                     if default_found:
-                        info('(targetless - not reachable since ' \
+                        _inf('(targetless - not reachable since ' \
                              + 'default target has been set)')
                     else:
-                        info('(targetless)')
+                        _inf('(targetless)')
                 continue
             if target and k[6:] != target:
-                d('Skipping %s because target is %s' \
+                _dbg('Skipping %s because target is %s' \
                   % (k, target))
                 continue
-            d('Examining step list %s' % k)
+            _dbg('Examining step list %s' % k)
             stepno = 0
             for step in yd[k]:
                 stepno += 1
@@ -257,10 +287,10 @@ for in_file in input_files:
                 lineno = '(%s)' % step_key
                 rsrc_pathname = varsub(step_key)
                 if rsrc_pathname == 'print':
-                    if type(step[step_key]) == type('a'):
+                    if isinstance(step[step_key], basestring):
                         print varsub(step[step_key])
                     else:
-                        w('%s %s' \
+                        _wrn('%s %s' \
                          % ('Print statements can only use string',
                             'arguments (with or without variables).'))
                     continue
@@ -271,14 +301,14 @@ for in_file in input_files:
                     profile = varsub(step[step_key])
                     continue
                 if rsrc_pathname[:4] == 'var.':
-                    if type(yd[k]) == type('a'):
+                    if isinstance(yd[k], basestring):
                         var[k[4:]] = varsub(yd[k])
                     else:
                         var[k[4:]] = yd[k]
                     continue
                 if os.path.exists('.terraflop-output/%s' \
                                  % rsrc_pathname):
-                    d('%s has already been run.' % rsrc_pathname)
+                    _dbg('%s has already been run.' % rsrc_pathname)
                     continue
                 if rsrc_pathname[0] == '+':
                     rsrc_pathname = rsrc_pathname[1:]
@@ -286,7 +316,7 @@ for in_file in input_files:
                 if words[0] == 'aws':
                     cmdtuple = (words[1], words[2])
                     argtupleraw = step[step_key]
-                    info('Running %s' % rsrc_pathname)
+                    _inf('Running %s' % rsrc_pathname)
                     outdict = aws_call(
                         region, profile, cmdtuple,
                         varsub_tuple(argtupleraw))
@@ -294,13 +324,13 @@ for in_file in input_files:
                 elif words[0] == 'exec':
                     cmd = words[1]
                     argtupleraw = step[step_key]
-                    info('Running %s' % rsrc_pathname)
+                    _inf('Running %s' % rsrc_pathname)
                     outdict = exec_call(
                         cmd, varsub_tuple(argtupleraw))
                     store_output(rsrc_pathname, outdict)
                 else:
-                    e('Unrecognized provider: %s' % words[0])
+                    _err('Unrecognized provider: %s' % words[0])
     if listing:
         if not default_found:
-            info('Default target: (all steps)')
+            _inf('Default target: (all steps)')
 
