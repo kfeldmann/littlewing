@@ -1,6 +1,9 @@
 #!/usr/bin/python2.7 -O
 
-"Terraflop: Simple, powerful infrastructure automation."
+"""
+Terraflop: Simple, powerful infrastructure automation.
+https://github.com/kfeldmann/terraflop
+"""
 
 import sys
 import yaml
@@ -236,6 +239,7 @@ input_files.sort()
 region = None
 profile = None
 var = {}
+target_groups = {}
 var['USER'] = os.environ.get('USER', 'terraflop')
 
 for in_file in input_files:
@@ -244,7 +248,8 @@ for in_file in input_files:
     lineno = '(yaml)'
     yd = yaml.load(f)
     f.close()
-    # Have to make sure we load all the vars before the steps
+    # Have to make sure we load all the vars, target-groups
+    # and default-target before the steps.
     for k in yd.keys():
         lineno = '(%s...)' % str(k)[:10]
         if k[:4] == 'var.':
@@ -263,73 +268,93 @@ for in_file in input_files:
                         _inf('Default target: %s' % target)
                 else:
                     _wrn('Default target must be a string.')
-    for k in yd.keys():
-        if k[:5] == 'steps':
-            if listing:
-                if k[6:]:
-                    _inf(k[6:])
-                else:
-                    if default_found:
-                        _inf('(targetless - not reachable since ' \
-                             + 'default target has been set)')
-                    else:
-                        _inf('(targetless)')
+        elif k == 'target-groups':
+            if not isinstance(yd[k], dict):
+                _wrn("'target-groups' must be a dict.")
                 continue
-            if target and k[6:] != target:
-                _dbg('Skipping %s because target is %s' \
-                  % (k, target))
-                continue
-            _dbg('Examining step list %s' % k)
-            stepno = 0
-            for step in yd[k]:
-                stepno += 1
-                step_key = step.keys()[0]
-                lineno = '(%s)' % step_key
-                rsrc_pathname = varsub(step_key)
-                if rsrc_pathname == 'print':
-                    if isinstance(step[step_key], basestring):
-                        print varsub(step[step_key])
+            for tgname in yd[k].keys():
+                if not isinstance(yd[k][tgname], list):
+                    _wrn("'target-groups: %s' must be a list." % tgname)
+                    continue
+                target_groups[tgname] = varsub_tuple(yd[k][tgname])
+                if listing:
+                    _inf('[%s]: %s' \
+                         % (tgname, ', '.join(target_groups[tgname])))
+    # Make the targets in a target-group run in order
+    if target and target in target_groups.keys():
+        goals = target_groups[target]
+    elif target:
+        goals = [target]
+    else:
+        goals = [None]
+    for goal in goals:
+        for k in yd.keys():
+            if k[:5] == 'steps':
+                if listing:
+                    if k[6:]:
+                        _inf(k[6:])
                     else:
-                        _wrn('%s %s' \
-                         % ('Print statements can only use string',
-                            'arguments (with or without variables).'))
+                        if default_found:
+                            _inf('(targetless - not reachable since ' \
+                                 + 'default target has been set)')
+                        else:
+                            _inf('(targetless)')
                     continue
-                if rsrc_pathname == 'region':
-                    region = varsub(step[step_key])
+                if goal and k[6:] != goal:
+                    _dbg('Skipping %s (target: %s, goal: %s)' \
+                         % (k, target, goal))
                     continue
-                if rsrc_pathname == 'profile':
-                    profile = varsub(step[step_key])
-                    continue
-                if rsrc_pathname[:4] == 'var.':
-                    if isinstance(yd[k], basestring):
-                        var[k[4:]] = varsub(yd[k])
+                _dbg('Examining step list %s' % k)
+                stepno = 0
+                for step in yd[k]:
+                    stepno += 1
+                    step_key = step.keys()[0]
+                    lineno = '(%s)' % step_key
+                    rsrc_pathname = varsub(step_key)
+                    if rsrc_pathname == 'print':
+                        if isinstance(step[step_key], basestring):
+                            print varsub(step[step_key])
+                        else:
+                            _wrn('%s %s' \
+                             % ('Print statements can only use string',
+                                'arguments (with or without variables).'))
+                        continue
+                    if rsrc_pathname == 'region':
+                        region = varsub(step[step_key])
+                        continue
+                    if rsrc_pathname == 'profile':
+                        profile = varsub(step[step_key])
+                        continue
+                    if rsrc_pathname[:4] == 'var.':
+                        if isinstance(yd[k], basestring):
+                            var[k[4:]] = varsub(yd[k])
+                        else:
+                            var[k[4:]] = yd[k]
+                        continue
+                    if os.path.exists('.terraflop-output/%s' \
+                                     % rsrc_pathname):
+                        _dbg('%s has already been run.' % rsrc_pathname)
+                        continue
+                    if rsrc_pathname[0] == '+':
+                        rsrc_pathname = rsrc_pathname[1:]
+                    words = rsrc_pathname.split('.')
+                    if words[0] == 'aws':
+                        cmdtuple = (words[1], words[2])
+                        argtupleraw = step[step_key]
+                        _inf('Running %s' % rsrc_pathname)
+                        outdict = aws_call(
+                            region, profile, cmdtuple,
+                            varsub_tuple(argtupleraw))
+                        store_output(rsrc_pathname, outdict)
+                    elif words[0] == 'exec':
+                        cmd = words[1]
+                        argtupleraw = step[step_key]
+                        _inf('Running %s' % rsrc_pathname)
+                        outdict = exec_call(
+                            cmd, varsub_tuple(argtupleraw))
+                        store_output(rsrc_pathname, outdict)
                     else:
-                        var[k[4:]] = yd[k]
-                    continue
-                if os.path.exists('.terraflop-output/%s' \
-                                 % rsrc_pathname):
-                    _dbg('%s has already been run.' % rsrc_pathname)
-                    continue
-                if rsrc_pathname[0] == '+':
-                    rsrc_pathname = rsrc_pathname[1:]
-                words = rsrc_pathname.split('.')
-                if words[0] == 'aws':
-                    cmdtuple = (words[1], words[2])
-                    argtupleraw = step[step_key]
-                    _inf('Running %s' % rsrc_pathname)
-                    outdict = aws_call(
-                        region, profile, cmdtuple,
-                        varsub_tuple(argtupleraw))
-                    store_output(rsrc_pathname, outdict)
-                elif words[0] == 'exec':
-                    cmd = words[1]
-                    argtupleraw = step[step_key]
-                    _inf('Running %s' % rsrc_pathname)
-                    outdict = exec_call(
-                        cmd, varsub_tuple(argtupleraw))
-                    store_output(rsrc_pathname, outdict)
-                else:
-                    _err('Unrecognized provider: %s' % words[0])
+                        _err('Unrecognized provider: %s' % words[0])
     if listing:
         if not default_found:
             _inf('Default target: (all steps)')

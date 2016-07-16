@@ -2,7 +2,15 @@ var.appname: target-test
 var.region: us-west-2
 var.profile: my-profile
 
-default-target: build
+target-groups:
+  all:
+  - build
+  - respin
+  - destroy
+  make:
+  - build
+
+#default-target: build
 
 steps.build:
 - print: this is my build command.
