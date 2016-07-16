@@ -2,8 +2,9 @@
 
 Terraflop is a simple infrastructure automation tool.
 
-Terraflop supports only AWS. It leverages aws-cli,
-and litterally can do anything that aws-cli can do.
+Terraflop supports only AWS. It leverages
+[aws-cli](https://aws.amazon.com/cli/), and litterally can do
+anything that aws-cli can do.
 
 ## How does it work
 
@@ -69,46 +70,72 @@ they sort unambiguously (see `example-apps`).
 30_database-tier.yml
 ```
 
-The configuration files use YAML (.yml) format. YAML is a
-standard format documented elsewhere.
+The configuration files use YAML 1.1 (.yml) format. [YAML is a
+standard format documented here](http://yaml.org/spec/1.1/).
 
 In Terraflop, the commands to be run are called steps. Steps are
 constructed using the following structure:
 
 ```YAML
-steps:
-- aws.CATEGORY.COMMAND.NAME:
+steps[.TARGET]:
+- PROVIDER.[AWS_CATEGORY.]COMMAND.NAME:
   - ARG
   - ...
 ```
 
-where CATEGORY is the command category in aws-cli, such as:
-`ec2`, `iam`, `autoscaling`, etc.
+TARGET is an optional label for the step list. If `flop` is then run
+with a target string as its argument, only steps matching that target
+will be examined.
 
-COMMAND is the aws-cli command, such as: `create-vpc`, etc.
+PROVIDER should be either `aws` or `exec`. Steps using the `aws`
+provider will be run using aws-cli, and those using the `exec`
+provider will be run by spawning a subprocess in your local
+environment (not on any remote instance).
+
+AWS_CATEGORY is the command category in aws-cli, such as:
+`ec2`, `iam`, `autoscaling`, etc. This is relevant only for the
+`aws` provider, and should be left out for steps using the
+`exec` provider.
+
+COMMAND is the command to run, such as `create-vpc` for
+aws, or any local command, shell script, etc. for the `exec`
+provider.
 
 NAME is a unique name for this instance of this command. This will
 allow you to distinguish between multiple uses of the same command.
 For example, if you are creating three subnets, you will call
-create-subnet three times. Provide three names to distinguish them.
-This is also how you will distinguish the subnets when you refer
-to them in subsequent steps.
+create-subnet three times. Providing three names will allow you to
+distinguish the subnets when you refer to them in subsequent steps.
+All step keys (PROVIDER.[AWS_CATEGORY.]COMMAND.NAME) must be unique
+throughout your project (not simply unique within the file).
 
 The arguments (ARG, ...) are exactly what you would pass to aws-cli for
-the same command. If a given command requires an argument of `--foo`
-and it's value of `bar`, those two separate strings should be listed in that
-order under the command.
+the same command. If a given command requires an argument of `--filters`
+and it's value of `Name=default,Values=true`, then those two separate
+strings should be listed in that order under the command.
 
-There should be at most one `steps:` key in each file. This `steps:` object
-is a list that contains all of the steps for that file.
+There should be at most one `steps[.TARGET]:` key for each unique
+TARGET in each file. This `steps[.TARGET]`
+object is a list that contains all of the steps for that TARGET in
+that file.
 
 Example:
 
 ```YAML
-steps:
+steps.build:
 - aws.ec2.describe-network-acls.default-acl:
   - --filters
   - Name=default,Values=true
+```
+
+A step can also consist of the key `print`, with any string
+(with or without variables and/or output references) as its
+value.
+
+Example:
+
+```YAML
+- print: "URL: http://${aws.elb.create-load-balancer.dev-web-0.DNSName}/"
 ```
 
 For each step, Terraflop first checks the output directory
@@ -116,6 +143,12 @@ For each step, Terraflop first checks the output directory
 the step has been run already. If it has run already, it will be
 skipped. Inside each of the output files you will see the attributes
 that can be referenced from subsequent commands.
+
+To force a step to run every time, regardless whether it already
+has run in the past, prepend the key with a `+` character.
+
+Print statements, variable assignments, and everything outside of
+any step list will always run every time.
 
 Variables can be used throughout a terraflop configuration. There
 are two types of variables: strings and maps.
@@ -220,8 +253,9 @@ configuration, for example to accept a peering connection request in another
 account.
 
 To make changes in a production setting, take a look at the strategy
-used in the blue/green pools of the sample app's web tier. By versioning
-the names of steps that _update_ infrastructure, you can change the config,
+used in the blue/green pools of the 'test-site' example app's web tier.
+By versioning the names of steps that _update_ infrastructure, you can
+change the config,
 bump the version, and then `flop` will see those as new steps which have
 not yet run. As a side effect, you will have the output of each of your
 previous versions acumulating in the outputs directory.
