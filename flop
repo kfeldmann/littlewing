@@ -47,7 +47,12 @@ def __varsub(in_str):
                 return var[words[1]][words[2]]
             else:
                 e('Unknown variable: %s.%s' % (words[1], words[2]))
-    fname = '.'.join(words[:4])
+    if words[0] == 'aws':
+        fname = '.'.join(words[:4])
+    elif words[0] == 'exec':
+        fname = '.'.join(words[:3])
+    else:
+        e('Unknown provider: %s' % words[0])
     try:
         f = open('.terraflop-output/%s' % fname, 'r')
         filename = '.terraflop-output/%s' % fname
@@ -141,7 +146,7 @@ def stringify(path, name, obj):
             strings.extend(stringify('%s.%s' % (path, name), i, item))
             i += 1
     else:
-        this = '%s.%s:%s' % (path, name, quote(obj))
+        this = '%s.%s:%s' % (path, name, quote(str(obj)))
         strings.append(this.strip('.'))
     return strings
 
