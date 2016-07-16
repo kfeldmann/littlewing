@@ -141,7 +141,7 @@ def stringify(path, name, obj):
             strings.extend(stringify('%s.%s' % (path, name), i, item))
             i += 1
     else:
-        this = '%s.%s:%s' % (path, name, quote(obj))
+        this = '%s.%s:%s' % (path, name, quote(str(obj)))
         strings.append(this.strip('.'))
     return strings
 
