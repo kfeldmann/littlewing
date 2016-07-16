@@ -1,0 +1,17 @@
+var.appname: target-test
+var.region: us-west-2
+var.profile: my-profile
+
+default-target: build
+
+steps.build:
+- print: this is my build command.
+
+steps.respin:
+- print: respinning the tier.
+
+steps.destroy:
+- print: now we will tear it all down.
+
+steps:
+- print: this one is targetless.

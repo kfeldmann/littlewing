@@ -20,6 +20,8 @@ def e(message):
     raise SystemExit, 1
 
 def w(message):
+    sys.stderr.write('WARN: file: %s, step: %s, line: %s\n' \
+                    % (filename, stepno, lineno))
     sys.stderr.write('WARN: %s\n' % message)
     return None
 
@@ -31,6 +33,10 @@ def d(message):
     if os.environ.get('DEBUG', False):
         sys.stdout.write('DEBUG: %s\n' % message)
     return None
+
+def usage():
+    sys.stderr.write('Usage: flop [-l|--list|<target>]\n')
+    raise SystemExit(1)
 
 def __varsub(in_str):
     d('__varsub(): starting with in_str = %s' % in_str)
@@ -168,6 +174,25 @@ def varsub_tuple(intuple):
         outtuple.append(varsub(item))
     return outtuple
 
+
+### main ###
+
+if len(sys.argv) > 2 \
+        or  '-?' in sys.argv \
+        or '-h' in sys.argv \
+        or '--help' in sys.argv:
+    usage()
+
+listing = False
+target = None
+default_found = False
+
+if len(sys.argv) == 2:
+    if sys.argv[1] in ('-l', '--list'):
+        listing = True
+    else:
+        target = sys.argv[1]
+
 if not os.path.exists('.terraflop-output'):
     os.mkdir('.terraflop-output')
 
@@ -191,16 +216,40 @@ for in_file in input_files:
     f.close()
     # Have to make sure we load all the vars before the steps
     for k in yd.keys():
+        lineno = '(%s...)' % str(k)[:10]
         if k[:4] == 'var.':
-            lineno = '(%s...)' % str(k)[:10]
             if type(yd[k]) == type('a'):
                 var[k[4:]] = varsub(yd[k])
             elif type(yd[k]) == type(0):
                 var[k[4:]] = str(yd[k])
             else:
                 var[k[4:]] = yd[k]
+        elif k == 'default-target':
+            if not target:
+                if isinstance(yd[k], str):
+                    target = varsub(yd[k])
+                    if listing:
+                        default_found = True
+                        info('Default target: %s' % target)
+                else:
+                    w('Default target must be a string.')
     for k in yd.keys():
-        if k == 'steps':
+        if k[:5] == 'steps':
+            if listing:
+                if k[6:]:
+                    info(k[6:])
+                else:
+                    if default_found:
+                        info('(targetless - not reachable since ' \
+                             + 'default target has been set)')
+                    else:
+                        info('(targetless)')
+                continue
+            if target and k[6:] != target:
+                d('Skipping %s because target is %s' \
+                  % (k, target))
+                continue
+            d('Examining step list %s' % k)
             stepno = 0
             for step in yd[k]:
                 stepno += 1
@@ -251,4 +300,7 @@ for in_file in input_files:
                     store_output(rsrc_pathname, outdict)
                 else:
                     e('Unrecognized provider: %s' % words[0])
+    if listing:
+        if not default_found:
+            info('Default target: (all steps)')
 
