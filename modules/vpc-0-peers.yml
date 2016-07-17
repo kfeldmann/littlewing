@@ -2,7 +2,7 @@
 #   var.vpc-cidr
 #   var.appname
 
-steps:
+steps.build:
 
 - aws.ec2.create-vpc.main:
   - --cidr-block
