@@ -4,6 +4,7 @@
 # - flowlog group (app-level)
 # - default network ACL tagged as 'blacklist'
 # - everything tagged with appname, contact
+# - VPC name is ${var.appname}
 
 # Prerequisites
 # - (none)
@@ -17,33 +18,33 @@
 
 steps.build:
 
-- aws.ec2.create-vpc.main:
+- aws.ec2.create-vpc.${var.appname}:
   - --cidr-block
   - ${var.vpc-cidr}
 
 - aws.ec2.create-tags.vpc:
   - --resources
-  - ${aws.ec2.create-vpc.main.Vpc.VpcId}
+  - ${aws.ec2.create-vpc.${var.appname}.Vpc.VpcId}
   - --tags
   - "Key=Name,Value=${var.appname} (${var.USER})"
   - Key=AppName,Value=${var.appname}
   - Key=Contact,Value=${var.USER}
 
-- aws.ec2.create-internet-gateway.main: null
+- aws.ec2.create-internet-gateway.${var.appname}: null
 
 - aws.ec2.create-tags.internet-gateway:
   - --resources
-  - ${aws.ec2.create-internet-gateway.main.InternetGateway.InternetGatewayId}
+  - ${aws.ec2.create-internet-gateway.${var.appname}.InternetGateway.InternetGatewayId}
   - --tags
   - "Key=Name,Value=${var.appname} (${var.USER})"
   - Key=AppName,Value=${var.appname}
   - Key=Contact,Value=${var.USER}
 
-- aws.ec2.attach-internet-gateway.main:
+- aws.ec2.attach-internet-gateway.${var.appname}:
   - --internet-gateway-id
-  - ${aws.ec2.create-internet-gateway.main.InternetGateway.InternetGatewayId}
+  - ${aws.ec2.create-internet-gateway.${var.appname}.InternetGateway.InternetGatewayId}
   - --vpc-id
-  - ${aws.ec2.create-vpc.main.Vpc.VpcId}
+  - ${aws.ec2.create-vpc.${var.appname}.Vpc.VpcId}
 
 # Role for flow logging
 - aws.iam.create-role.${var.appname}-vpc-flow-log-role:
@@ -64,7 +65,7 @@ steps.build:
 
 - aws.ec2.create-flow-logs.${var.appname}:
   - --resource-ids
-  - ${aws.ec2.create-vpc.main.Vpc.VpcId}
+  - ${aws.ec2.create-vpc.${var.appname}.Vpc.VpcId}
   - --resource-type
   - VPC
   - --traffic-type
@@ -79,7 +80,7 @@ steps.build:
 - aws.ec2.describe-network-acls.blacklist-acl:
   - --filters
   - Name=default,Values=true
-  - Name=vpc-id,Values=${aws.ec2.create-vpc.main.Vpc.VpcId}
+  - Name=vpc-id,Values=${aws.ec2.create-vpc.${var.appname}.Vpc.VpcId}
 
 - aws.ec2.create-tags.blacklist-acl:
   - --resources
