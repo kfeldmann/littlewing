@@ -4,6 +4,7 @@
 # - flowlog group (environment-level)
 # - default network ACL tagged as 'blacklist'
 # - everything tagged with appname, environment, contact
+# - VPC name is ${var.environment}
 
 # Prerequisites
 # - (none)
