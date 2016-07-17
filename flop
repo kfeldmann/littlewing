@@ -128,10 +128,12 @@ def varsub(val):
 
 def aws_call(region, profile, cmdtuple, argtuple):
     "Spawn aws-cli subprocess to execute commands."
-    args = [ \
+    if (not region) or (not profile):
+        _err('Must set region and profile before calling aws.')
+    args = [
             AWSCLI,
             '--region', region,
-            '--profile', profile,
+            '--profile', profile
            ]
     args.extend(cmdtuple)
     if argtuple:
@@ -139,8 +141,9 @@ def aws_call(region, profile, cmdtuple, argtuple):
     try:
         outdata = subprocess.check_output(args)
     except Exception as ex:
-        _err('Failed to run %s %s %s: %s' \
-         % (AWSCLI, cmdtuple[0], cmdtuple[1], ex))
+        _err('Failed to run %s %s %s: %s\n' \
+             % (AWSCLI, cmdtuple[0], cmdtuple[1], ex) \
+             + 'ERROR: Args: %s' % repr(args))
     if outdata: # Some calls do not return data
         try:
             outdict = json.loads(outdata)
@@ -249,7 +252,10 @@ for in_file in input_files:
     yd = yaml.load(f)
     f.close()
     # Have to make sure we load all the vars, target-groups
-    # and default-target before the steps.
+    # and default-target before setting region/profile or
+    # running the steps.
+    if listing:
+        _inf('File: %s' % filename)
     for k in yd.keys():
         lineno = '(%s...)' % str(k)[:10]
         if k[:4] == 'var.':
@@ -280,6 +286,14 @@ for in_file in input_files:
                 if listing:
                     _inf('[%s]: %s' \
                          % (tgname, ', '.join(target_groups[tgname])))
+
+    # Set region/profile (if found)
+    for k in yd.keys():
+        if k == 'region':
+            region = varsub(yd[k])
+        elif k == 'profile':
+            profile = varsub(yd[k])
+
     # Make the targets in a target-group run in order
     if target and target in target_groups.keys():
         goals = target_groups[target]
@@ -290,9 +304,10 @@ for in_file in input_files:
     for goal in goals:
         for k in yd.keys():
             if k[:5] == 'steps':
+                tgt = varsub(k[6:])
                 if listing:
-                    if k[6:]:
-                        _inf(k[6:])
+                    if tgt:
+                        _inf(tgt)
                     else:
                         if default_found:
                             _inf('(targetless - not reachable since ' \
@@ -300,9 +315,9 @@ for in_file in input_files:
                         else:
                             _inf('(targetless)')
                     continue
-                if goal and k[6:] != goal:
+                if goal and tgt != goal:
                     _dbg('Skipping %s (target: %s, goal: %s)' \
-                         % (k, target, goal))
+                         % (tgt, target, goal))
                     continue
                 _dbg('Examining step list %s' % k)
                 stepno = 0
@@ -353,6 +368,12 @@ for in_file in input_files:
                         outdict = exec_call(
                             cmd, varsub_tuple(argtupleraw))
                         store_output(rsrc_pathname, outdict)
+                    elif words[0] == 'ssh':
+                        argtupleraw = step[step_key]
+                        _inf('Running %s' % rsrc_pathname)
+                        args = ['ssh']
+                        args.extend(varsub_tuple(argtupleraw))
+                        response = subprocess.call(args)
                     else:
                         _err('Unrecognized provider: %s' % words[0])
     if listing:
