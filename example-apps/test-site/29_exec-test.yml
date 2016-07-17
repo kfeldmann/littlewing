@@ -1,4 +1,4 @@
-steps:
+steps.sample:
 
 # To cause any step to run every time flop runs, prepend it's
 # step key with a + character.

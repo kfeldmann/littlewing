@@ -1,5 +1,14 @@
+var.blue-version: 201607130652
+var.blue-scale-min: 2
+var.blue-scale-desired: 2
+var.blue-scale-max: 2
+
+var.green-version: 201607130652
+var.green-scale-min: 0
+var.green-scale-desired: 0
+var.green-scale-max: 0
+
 var.environment: dev
-var.subsystem: website
 var.tier: web
 
 var.elb-0-scheme: internet-facing # (internet-facing | internal)
@@ -14,15 +23,6 @@ var.elb-0-listener-0-port: 80
 var.elb-0-listener-0-protocol: http # (tcp|ssl|http|https)
 var.elb-0-instance-0-port: 80
 var.elb-0-instance-0-protocol: http # (tcp|ssl|http|https)
-
-var.blue-lc-version: 201607130652
-var.blue-scale-min: 2
-var.blue-scale-desired: 2
-var.blue-scale-max: 2
-var.green-lc-version: 201607130652
-var.green-scale-min: 0
-var.green-scale-desired: 0
-var.green-scale-max: 0
 
 var.blue-image-owner: amazon
 var.blue-image-name: amzn-ami-minimal-hvm-2016.03.0.x86_64-ebs
