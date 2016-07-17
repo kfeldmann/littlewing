@@ -5,11 +5,14 @@
 # - default network ACL tagged as 'blacklist'
 # - everything tagged with appname, environment, contact
 
+# Prerequisites
+# - (none)
+
 # Required vars
 # - var.vpc-cidr
 # - var.appname
 # - var.environment
-#
+
 # Targets:
 # - [build]: build-${var.environment}
 # - build-${var.environment}
