@@ -1,6 +1,14 @@
+# An App-level VPC with:
+# - internet gateway
+# - flowlog role/policy
+# - default network ACL tagged as 'blacklist'
+# - everything tagged with appname, contact
+
 # Required vars
 #   var.vpc-cidr
 #   var.appname
+# Targets:
+#   build
 
 steps.build:
 
@@ -65,7 +73,3 @@ steps.build:
   - Key=Purpose,Value=blacklist
   - Key=Contact,Value=${var.USER}
 
-
-# Put VPC peering here
-# Use "- profile:" to switch to the peer account to do the approval,
-# return routes, then switch back to the main profile again.
