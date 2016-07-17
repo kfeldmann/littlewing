@@ -1,0 +1,98 @@
+# An Environment-level VPC with:
+# - internet gateway
+# - flowlog role/policy
+# - flowlog group
+# - default network ACL tagged as 'blacklist'
+# - everything tagged with appname, environment, contact
+
+# Required vars
+# - var.vpc-cidr
+# - var.appname
+# - var.environment
+#
+# Targets:
+# - [build]: build-${var.environment}
+# - build-${var.environment}
+
+target-groups:
+  build:
+  - build-${var.environment}
+
+steps.build-${var.environment}:
+
+- aws.ec2.create-vpc.${var.environment}:
+  - --cidr-block
+  - ${var.vpc-cidr}
+
+- aws.ec2.create-tags.vpc-${var.environment}:
+  - --resources
+  - ${aws.ec2.create-vpc.${var.environment}.Vpc.VpcId}
+  - --tags
+  - "Key=Name,Value=${var.appname}-${var.environment} (${var.USER})"
+  - Key=AppName,Value=${var.appname}
+  - Key=Environment,Value=${var.environment}
+  - Key=Contact,Value=${var.USER}
+
+- aws.ec2.create-internet-gateway.${var.environment}: null
+
+- aws.ec2.create-tags.internet-gateway-${var.environment}:
+  - --resources
+  - ${aws.ec2.create-internet-gateway.${var.environment}.InternetGateway.InternetGatewayId}
+  - --tags
+  - "Key=Name,Value=${var.appname}-${var.environment} (${var.USER})"
+  - Key=AppName,Value=${var.appname}
+  - Key=Environment,Value=${var.environment}
+  - Key=Contact,Value=${var.USER}
+
+- aws.ec2.attach-internet-gateway.${var.environment}:
+  - --internet-gateway-id
+  - ${aws.ec2.create-internet-gateway.${var.environment}.InternetGateway.InternetGatewayId}
+  - --vpc-id
+  - ${aws.ec2.create-vpc.${var.environment}.Vpc.VpcId}
+
+# Role for flow logging
+- aws.iam.create-role.${var.environment}-vpc-flow-log-role:
+  - --role-name
+  - ${var.appname}-${var.environment}-vpc-flow-log-role
+  - --assume-role-policy-document
+  - |
+    {"Version":"2012-10-17","Statement":[{"Sid":"","Effect":"Allow","Principal":{"Service":"vpc-flow-logs.amazonaws.com"},"Action":"sts:AssumeRole"}]}
+
+- aws.iam.put-role-policy.${var.environment}-vpc-flow-log-policy:
+  - --role-name
+  - ${var.appname}-${var.environment}-vpc-flow-log-role
+  - --policy-name
+  - ${var.appname}-${var.environment}-vpc-flow-log-policy
+  - --policy-document
+  - |
+    {"Version":"2012-10-17","Statement":[{"Action":["logs:CreateLogGroup","logs:CreateLogStream","logs:PutLogEvents","logs:DescribeLogGroups","logs:DescribeLogStreams"],"Effect":"Allow","Resource":"*"}]}
+
+- aws.ec2.create-flow-logs.${var.environment}:
+  - --resource-ids
+  - ${aws.ec2.create-vpc.${var.environment}.Vpc.VpcId}
+  - --resource-type
+  - VPC
+  - --traffic-type
+  - ALL
+  - --log-group-name
+  - ${var.appname}-${var.environment}
+  - --deliver-logs-permission-arn
+  - ${aws.iam.create-role.${var.environment}-vpc-flow-log-role.Role.Arn}
+
+# Tag the default Network ACL as the "Blacklist" ACL
+# (to be used to block attackers)
+- aws.ec2.describe-network-acls.${var.environment}-blacklist-acl:
+  - --filters
+  - Name=default,Values=true
+  - Name=vpc-id,Values=${aws.ec2.create-vpc.${var.environment}.Vpc.VpcId}
+
+- aws.ec2.create-tags.${var.environment}-blacklist-acl:
+  - --resources
+  - ${aws.ec2.describe-network-acls.${var.environment}-blacklist-acl.NetworkAcls.0.NetworkAclId}
+  - --tags
+  - "Key=Name,Value=blacklist - ${var.appname}-${var.environment} (${var.USER})"
+  - Key=AppName,Value=${var.appname}
+  - Key=Environment,Value=${var.environment}
+  - Key=Purpose,Value=blacklist
+  - Key=Contact,Value=${var.USER}
+
