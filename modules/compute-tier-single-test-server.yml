@@ -1,0 +1,186 @@
+# A compute tier with only a single, short-term test instance
+# - One subnet
+# - One security group
+# - No auto scaling group
+# - No load balancer
+
+# Prerequisites
+# - Per-environment VPC
+
+# Required vars
+# - appname
+# - environment
+# - tier
+# - version
+# - az-letter
+# - subnet-cidr
+# - ssh-key-name
+# - ssh-user
+# - image-owner
+# - image-name
+# - instance-type
+# - root-volume-size
+# - cf-config
+
+# Targets
+# - [build]: build-${var.environment}-${var.tier}
+# - [build-${var.environment}]: build-${var.environment}-${var.tier}
+# - build-${var.environment}-${var.tier}
+# - [terminate]: terminate-${var.environment}-${var.tier}
+# - [terminate-${var.environment}]: terminate-${var.environment}-${var.tier}
+# - terminate-${var.environment}-${var.tier}
+# - ssh-${var.environment}-${var.tier}:
+
+target-groups:
+  build:
+  - build-${var.environment}-${var.tier}
+  build-${var.environment}:
+  - build-${var.environment}-${var.tier}
+  terminate:
+  - terminate-${var.environment}-${var.tier}
+  terminate-${var.environment}:
+  - terminate-${var.environment}-${var.tier}
+
+steps.terminate-${var.environment}-${var.tier}:
+- aws.ec2.terminate-instances.${var.environment}-${var.tier}-${var.version}:
+  - --instance-ids
+  - ${aws.ec2.describe-instances.${var.environment}-${var.tier}-${var.version}.Reservations.0.Instances.0.InstanceId}
+
+steps.ssh-${var.environment}-${var.tier}:
+- print: "SSH Key:    ${var.ssh-key-name}"
+- print: "InstanceId: ${aws.ec2.describe-instances.${var.environment}-${var.tier}-${var.version}.Reservations.0.Instances.0.InstanceId}"
+- print: "IP Address: ${aws.ec2.describe-instances.${var.environment}-${var.tier}-${var.version}.Reservations.0.Instances.0.PublicIpAddress}"
+- ssh:
+  - '-i'
+  - /home/${var.USER}/.ssh/${var.ssh-key-name}
+  - '-l'
+  - ${var.ssh-user}
+  - ${aws.ec2.describe-instances.${var.environment}-${var.tier}-${var.version}.Reservations.0.Instances.0.PublicIpAddress}
+
+steps.build-${var.environment}-${var.tier}:
+- exec.cf.${var.environment}-${var.tier}-${var.version}:
+  - '-s'
+  - ${var.cf-config}
+
+- aws.ec2.create-subnet.${var.environment}-${var.tier}-${var.az-letter}:
+  - --vpc-id
+  - ${aws.ec2.create-vpc.${var.environment}.Vpc.VpcId}
+  - --cidr-block
+  - ${var.subnet-cidr}
+  - --availability-zone
+  - ${var.region}${var.az-letter}
+
+- aws.ec2.create-tags.subnets-${var.environment}-${var.tier}:
+  - --resources
+  - ${aws.ec2.create-subnet.${var.environment}-${var.tier}-${var.az-letter}.Subnet.SubnetId}
+  - --tags
+  - "Key=Name,Value=${var.appname}-${var.environment}-${var.tier} (${var.USER})"
+  - Key=AppName,Value=${var.appname}
+  - Key=Environment,Value=${var.environment}
+  - Key=Tier,Value=${var.tier}
+  - Key=Contact,Value=${var.USER}
+
+- aws.ec2.modify-subnet-attribute.${var.environment}-${var.tier}-${var.az-letter}:
+  - --subnet-id
+  - ${aws.ec2.create-subnet.${var.environment}-${var.tier}-${var.az-letter}.Subnet.SubnetId}
+  - --map-public-ip-on-launch
+
+- aws.ec2.create-route-table.${var.environment}-${var.tier}:
+  - --vpc-id
+  - ${aws.ec2.create-vpc.${var.environment}.Vpc.VpcId}
+
+- aws.ec2.create-tags.route-table-${var.environment}-${var.tier}:
+  - --resources
+  - ${aws.ec2.create-route-table.${var.environment}-${var.tier}.RouteTable.RouteTableId}
+  - --tags
+  - "Key=Name,Value=${var.appname}-${var.environment}-${var.tier} (${var.USER})"
+  - Key=AppName,Value=${var.appname}
+  - Key=Environment,Value=${var.environment}
+  - Key=Tier,Value=${var.tier}
+  - Key=Contact,Value=${var.USER}
+
+- aws.ec2.associate-route-table.${var.environment}-${var.tier}-${var.az-letter}:
+  - --subnet-id
+  - ${aws.ec2.create-subnet.${var.environment}-${var.tier}-${var.az-letter}.Subnet.SubnetId}
+  - --route-table-id
+  - ${aws.ec2.create-route-table.${var.environment}-${var.tier}.RouteTable.RouteTableId}
+
+- aws.ec2.create-route.internet-gateway-${var.environment}-${var.tier}:
+  - --route-table-id
+  - ${aws.ec2.create-route-table.${var.environment}-${var.tier}.RouteTable.RouteTableId}
+  - --destination-cidr-block
+  - 0.0.0.0/0
+  - --gateway-id
+  - ${aws.ec2.create-internet-gateway.${var.environment}.InternetGateway.InternetGatewayId}
+
+- aws.ec2.create-vpc-endpoint.${var.environment}-${var.tier}:
+  - --vpc-id
+  - ${aws.ec2.create-vpc.${var.environment}.Vpc.VpcId}
+  - --service-name
+  - com.amazonaws.${var.region}.s3
+  - --route-table-ids
+  - ${aws.ec2.create-route-table.${var.environment}-${var.tier}.RouteTable.RouteTableId}
+
+- aws.ec2.create-security-group.${var.environment}-${var.tier}-app:
+  - --group-name
+  - ${var.appname}-${var.environment}-${var.tier}-app
+  - --description
+  - App security group for the ${var.appname}-${var.environment}-${var.tier} tier.
+  - --vpc-id
+  - ${aws.ec2.create-vpc.${var.environment}.Vpc.VpcId}
+
+- aws.ec2.create-tags.security-group-${var.environment}-${var.tier}-app:
+  - --resources
+  - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-app.GroupId}
+  - --tags
+  - "Key=Name,Value=app ${var.appname}-${var.environment}-${var.tier} (${var.USER})"
+  - Key=AppName,Value=${var.appname}
+  - Key=Environment,Value=${var.environment}
+  - Key=Tier,Value=${var.tier}
+  - Key=Purpose,Value=app
+  - Key=Contact,Value=${var.USER}
+
+- aws.ec2.revoke-security-group-egress.${var.environment}-${var.tier}-app:
+  - --group-id
+  - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-app.GroupId}
+  - --protocol
+  - '-1'
+  - --cidr
+  - 0.0.0.0/0
+
+- aws.ec2.describe-images.${var.environment}-${var.tier}-${var.version}:
+  - --owners
+  - ${var.image-owner}
+  - --filters
+  - "Name=name,Values='${var.image-name}'"
+
+- aws.ec2.run-instances.${var.environment}-${var.tier}-${var.version}:
+  - --image-id
+  - ${aws.ec2.describe-images.${var.environment}-${var.tier}.Images.0.ImageId}
+  - --key-name
+  - ${var.ssh-key-name}
+  - --security-group-ids
+  - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-app.GroupId}
+  - --user-data
+  - ${exec.cf.${var.environment}-${var.tier}.Output}
+  - --instance-type
+  - ${var.instance-type-${var.environment}-${var.tier}}
+  - --block-device-mappings
+  - '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":${var.root-volume-size}}}]'
+  - --subnet-id
+  - ${aws.ec2.create-subnet.${var.environment}-${var.tier}-${var.az-letter}.Subnet.SubnetId}
+
+- aws.ec2.create-tags.instance-${var.environment}-${var.tier}-${var.version}:
+  - --resources
+  - ${aws.ec2.run-instances.${var.environment}-${var.tier}-${var.version}.Instances.0.InstanceId}
+  - --tags
+  - "Key=Name,Value=${var.appname}-${var.environment}-${var.tier} (${var.USER})"
+  - Key=AppName,Value=${var.appname}
+  - Key=Environment,Value=${var.environment}
+  - Key=Tier,Value=${var.tier}
+  - Key=DevelopInstance,Value=true
+  - Key=Contact,Value=${var.USER}
+
+- exec.sleep.wait-for-instance-${var.environment}-${var.tier}-${var.version}:
+  - 60
+
