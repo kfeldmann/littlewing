@@ -1,12 +1,14 @@
 # A compute tier with:
 # - One ELB with one non-secure listener
 # - Two auto scaling groups with blue/green pool switching
-# - Five security groups:
+# - Seven security groups (with default rules removed):
 #   - app (for the instances)
 #   - s3 (for the instances, for the prefix-list rule)
 #   - elb (for the ELB)
 #   - acl1 (for the ELB; room for additional rules due to 50 rule per group limit)
 #   - acl2 (for the ELB; room for additional rules due to 50 rule per group limit)
+#   - acl3 (for the ELB; room for additional rules due to 50 rule per group limit)
+#   - acl4 (for the ELB; room for additional rules due to 50 rule per group limit)
 # - One S3 service endpoint
 # - Two availability zones
 # - Public-only, per-tier subnet model
@@ -213,6 +215,22 @@ steps.build-${var.environment}-${var.tier}:
   - --vpc-id
   - ${aws.ec2.create-vpc.${var.vpc-name}.Vpc.VpcId}
 
+- aws.ec2.create-security-group.${var.environment}-${var.tier}-acl3:
+  - --group-name
+  - ${var.appname}-${var.environment}-${var.tier}-acl3
+  - --description
+  - ACL-3 security group for the ${var.appname}-${var.environment}-${var.tier} tier.
+  - --vpc-id
+  - ${aws.ec2.create-vpc.${var.vpc-name}.Vpc.VpcId}
+
+- aws.ec2.create-security-group.${var.environment}-${var.tier}-acl4:
+  - --group-name
+  - ${var.appname}-${var.environment}-${var.tier}-acl4
+  - --description
+  - ACL-4 security group for the ${var.appname}-${var.environment}-${var.tier} tier.
+  - --vpc-id
+  - ${aws.ec2.create-vpc.${var.vpc-name}.Vpc.VpcId}
+
 - aws.ec2.create-tags.security-group-${var.environment}-${var.tier}-app:
   - --resources
   - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-app.GroupId}
@@ -268,6 +286,28 @@ steps.build-${var.environment}-${var.tier}:
   - Key=Purpose,Value=acl2
   - Key=Contact,Value=${var.USER}
 
+- aws.ec2.create-tags.security-group-${var.environment}-${var.tier}-acl3:
+  - --resources
+  - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-acl3.GroupId}
+  - --tags
+  - "Key=Name,Value=acl3 ${var.appname}-${var.environment}-${var.tier} (${var.USER})"
+  - Key=AppName,Value=${var.appname}
+  - Key=Environment,Value=${var.environment}
+  - Key=Tier,Value=${var.tier}
+  - Key=Purpose,Value=acl3
+  - Key=Contact,Value=${var.USER}
+
+- aws.ec2.create-tags.security-group-${var.environment}-${var.tier}-acl4:
+  - --resources
+  - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-acl4.GroupId}
+  - --tags
+  - "Key=Name,Value=acl4 ${var.appname}-${var.environment}-${var.tier} (${var.USER})"
+  - Key=AppName,Value=${var.appname}
+  - Key=Environment,Value=${var.environment}
+  - Key=Tier,Value=${var.tier}
+  - Key=Purpose,Value=acl4
+  - Key=Contact,Value=${var.USER}
+
 - aws.ec2.revoke-security-group-egress.${var.environment}-${var.tier}-app:
   - --group-id
   - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-app.GroupId}
@@ -308,6 +348,22 @@ steps.build-${var.environment}-${var.tier}:
   - --cidr
   - 0.0.0.0/0
 
+- aws.ec2.revoke-security-group-egress.${var.environment}-${var.tier}-acl3:
+  - --group-id
+  - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-acl3.GroupId}
+  - --protocol
+  - '-1'
+  - --cidr
+  - 0.0.0.0/0
+
+- aws.ec2.revoke-security-group-egress.${var.environment}-${var.tier}-acl4:
+  - --group-id
+  - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-acl4.GroupId}
+  - --protocol
+  - '-1'
+  - --cidr
+  - 0.0.0.0/0
+
 - aws.elb.create-load-balancer.${var.environment}-${var.tier}-0:
   - --load-balancer-name
   - ${var.appname}-${var.environment}-${var.tier}-0
@@ -318,6 +374,10 @@ steps.build-${var.environment}-${var.tier}:
   - ${aws.ec2.create-subnet.${var.environment}-${var.tier}-${var.az-letter-1}.Subnet.SubnetId}
   - --security-groups
   - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-elb.GroupId}
+  - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-acl1.GroupId}
+  - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-acl2.GroupId}
+  - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-acl3.GroupId}
+  - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-acl4.GroupId}
   - --scheme
   - ${var.elb-0-scheme}
   - --tags
