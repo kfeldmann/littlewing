@@ -1,14 +1,20 @@
 # A compute tier with:
 # - One ELB with one non-secure listener
 # - Two auto scaling groups with blue/green pool switching
+# - Encryption of AMI root volume
+#     (using account's default CMK for EBS)
 # - Seven security groups (with default rules removed):
 #   - app (for the instances)
 #   - s3 (for the instances, for the prefix-list rule)
 #   - elb (for the ELB)
-#   - acl1 (for the ELB; room for additional rules due to 50 rule per group limit)
-#   - acl2 (for the ELB; room for additional rules due to 50 rule per group limit)
-#   - acl3 (for the ELB; room for additional rules due to 50 rule per group limit)
-#   - acl4 (for the ELB; room for additional rules due to 50 rule per group limit)
+#   - acl1 (for the ELB; room for additional rules
+#       due to 50 rule per group limit)
+#   - acl2 (for the ELB; room for additional rules
+#       due to 50 rule per group limit)
+#   - acl3 (for the ELB; room for additional rules
+#       due to 50 rule per group limit)
+#   - acl4 (for the ELB; room for additional rules
+#       due to 50 rule per group limit)
 # - One S3 service endpoint
 # - Two availability zones
 # - Public-only, per-tier subnet model
@@ -43,13 +49,13 @@
 # - elb-0-instance-0-protocol
 #
 # - ssh-key-name
-# - instance-role-policy
 #
 # - blue-version
-# - blue-image-owner
-# - blue-image-name
+# - blue-image-owner # source image before encryption
+# - blue-image-name  # source image before encryption
 # - blue-root-volume-size
 # - blue-user-data
+# - blue-instance-role-policy
 # - blue-instance-type
 # - blue-scale-min
 # - blue-scale-desired
@@ -58,10 +64,11 @@
 # - blue-cooldown
 #
 # - green-version
-# - green-image-owner
-# - green-image-name
+# - green-image-owner # source image before encryption
+# - green-image-name  # source image before encryption
 # - green-root-volume-size
 # - green-user-data
+# - green-instance-role-policy
 # - green-instance-type
 # - green-scale-min
 # - green-scale-desired
@@ -405,11 +412,31 @@ steps.build-${var.environment}-${var.tier}:
   - --filters
   - "Name=name,Values='${var.blue-image-name}'"
 
+# Copy/encrypt once per region + ami-id
+- aws.ec2.copy-image.${var.region}-${aws.ec2.describe-images.${var.environment}-${var.tier}-${var.blue-version}.Images.0.ImageId}:
+  - --source-region
+  - ${var.region}
+  - --source-image-id
+  - ${aws.ec2.describe-images.${var.environment}-${var.tier}-${var.blue-version}.Images.0.ImageId}
+  - --name
+  - ${var.blue-image-name}
+  - --encrypted
+
 - aws.ec2.describe-images.${var.environment}-${var.tier}-${var.green-version}:
   - --owners
   - ${var.green-image-owner}
   - --filters
   - "Name=name,Values='${var.green-image-name}'"
+
+# Copy/encrypt once per region + ami-id
+- aws.ec2.copy-image.${var.region}-${aws.ec2.describe-images.${var.environment}-${var.tier}-${var.green-version}.Images.0.ImageId}:
+  - --source-region
+  - ${var.region}
+  - --source-image-id
+  - ${aws.ec2.describe-images.${var.environment}-${var.tier}-${var.green-version}.Images.0.ImageId}
+  - --name
+  - ${var.green-image-name}
+  - --encrypted
 
 - aws.iam.create-role.${var.environment}-${var.tier}:
   - --role-name
@@ -429,13 +456,21 @@ steps.build-${var.environment}-${var.tier}:
       ]
     }
 
-- aws.iam.put-role-policy.${var.environment}-${var.tier}:
+- aws.iam.put-role-policy.${var.environment}-${var.tier}-${var.blue-version}:
   - --role-name
   - ${var.appname}-${var.environment}-${var.tier}
   - --policy-name
   - ${var.appname}-${var.environment}-${var.tier}
   - --policy-document
-  - ${var.instance-role-policy}
+  - ${var.blue-instance-role-policy}
+
+- aws.iam.put-role-policy.${var.environment}-${var.tier}-${var.green-version}:
+  - --role-name
+  - ${var.appname}-${var.environment}-${var.tier}
+  - --policy-name
+  - ${var.appname}-${var.environment}-${var.tier}
+  - --policy-document
+  - ${var.green-instance-role-policy}
 
 - aws.iam.create-instance-profile.${var.environment}-${var.tier}:
   - --instance-profile-name
@@ -471,7 +506,7 @@ steps.build-${var.environment}-${var.tier}:
   - --launch-configuration-name
   - ${var.appname}-${var.environment}-${var.tier}-blue-${var.blue-version}
   - --image-id
-  - ${aws.ec2.describe-images.${var.environment}-${var.tier}-${var.blue-version}.Images.0.ImageId}
+  - ${aws.ec2.copy-image.${var.region}-${aws.ec2.describe-images.${var.environment}-${var.tier}-${var.blue-version}.Images.0.ImageId}.ImageId}
   - --key-name
   - ${var.ssh-key-name}
   - --security-groups
@@ -490,7 +525,7 @@ steps.build-${var.environment}-${var.tier}:
   - --launch-configuration-name
   - ${var.appname}-${var.environment}-${var.tier}-green-${var.green-version}
   - --image-id
-  - ${aws.ec2.describe-images.${var.environment}-${var.tier}-${var.green-version}.Images.0.ImageId}
+  - ${aws.ec2.copy-image.${var.region}-${aws.ec2.describe-images.${var.environment}-${var.tier}-${var.green-version}.Images.0.ImageId}.ImageId}
   - --key-name
   - ${var.ssh-key-name}
   - --security-groups
