@@ -1,3 +1,6 @@
+var.environment: dev
+var.tier: web
+
 var.blue-version: 201607130652
 var.blue-scale-min: 2
 var.blue-scale-desired: 2
@@ -7,9 +10,6 @@ var.green-version: 201607130652
 var.green-scale-min: 0
 var.green-scale-desired: 0
 var.green-scale-max: 0
-
-var.environment: dev
-var.tier: web
 
 var.elb-0-scheme: internet-facing # (internet-facing | internal)
 var.elb-0-idle-timeout: 15 # 1-3600 seconds
@@ -58,7 +58,7 @@ var.green-user-data: |
   runcmd:
   - /sbin/service httpd start
 
-var.instance-role-policy: |
+var.blue-instance-role-policy: |
   {
     "Version": "2012-10-17",
     "Statement": [
@@ -82,3 +82,29 @@ var.instance-role-policy: |
       }
     ]
   }
+
+var.green-instance-role-policy: |
+  {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "FullS3",
+        "Effect": "Allow",
+        "Action": "s3:*",
+        "Resource": "*"
+      },
+      {
+        "Sid": "KmsEncryption",
+        "Effect": "Allow",
+        "Action": [
+          "kms:Decrypt",
+          "kms:Encrypt",
+          "kms:ReEncrypt*"
+        ],
+        "Resource": [
+          "*"
+        ]
+      }
+    ]
+  }
+
