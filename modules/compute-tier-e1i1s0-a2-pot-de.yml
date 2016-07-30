@@ -105,7 +105,6 @@ steps.build-${var.environment}-${var.tier}:
   - "Key=Name,Value=${var.appname}-${var.environment}-${var.tier} (${var.USER})"
   - Key=AppName,Value=${var.appname}
   - Key=Environment,Value=${var.environment}
-  - Key=Subsystem,Value=${var.subsystem}
   - Key=Tier,Value=${var.tier}
   - Key=Contact,Value=${var.USER}
 
@@ -130,7 +129,6 @@ steps.build-${var.environment}-${var.tier}:
   - "Key=Name,Value=${var.appname}-${var.environment}-${var.tier} (${var.USER})"
   - Key=AppName,Value=${var.appname}
   - Key=Environment,Value=${var.environment}
-  - Key=Subsystem,Value=${var.subsystem}
   - Key=Tier,Value=${var.tier}
   - Key=Contact,Value=${var.USER}
 
@@ -222,7 +220,6 @@ steps.build-${var.environment}-${var.tier}:
   - "Key=Name,Value=app ${var.appname}-${var.environment}-${var.tier} (${var.USER})"
   - Key=AppName,Value=${var.appname}
   - Key=Environment,Value=${var.environment}
-  - Key=Subsystem,Value=${var.subsystem}
   - Key=Tier,Value=${var.tier}
   - Key=Purpose,Value=app
   - Key=Contact,Value=${var.USER}
@@ -234,7 +231,6 @@ steps.build-${var.environment}-${var.tier}:
   - "Key=Name,Value=s3 ${var.appname}-${var.environment}-${var.tier} (${var.USER})"
   - Key=AppName,Value=${var.appname}
   - Key=Environment,Value=${var.environment}
-  - Key=Subsystem,Value=${var.subsystem}
   - Key=Tier,Value=${var.tier}
   - Key=Purpose,Value=s3
   - Key=Contact,Value=${var.USER}
@@ -246,7 +242,6 @@ steps.build-${var.environment}-${var.tier}:
   - "Key=Name,Value=elb ${var.appname}-${var.environment}-${var.tier} (${var.USER})"
   - Key=AppName,Value=${var.appname}
   - Key=Environment,Value=${var.environment}
-  - Key=Subsystem,Value=${var.subsystem}
   - Key=Tier,Value=${var.tier}
   - Key=Purpose,Value=elb
   - Key=Contact,Value=${var.USER}
@@ -258,7 +253,6 @@ steps.build-${var.environment}-${var.tier}:
   - "Key=Name,Value=acl1 ${var.appname}-${var.environment}-${var.tier} (${var.USER})"
   - Key=AppName,Value=${var.appname}
   - Key=Environment,Value=${var.environment}
-  - Key=Subsystem,Value=${var.subsystem}
   - Key=Tier,Value=${var.tier}
   - Key=Purpose,Value=acl1
   - Key=Contact,Value=${var.USER}
@@ -270,7 +264,6 @@ steps.build-${var.environment}-${var.tier}:
   - "Key=Name,Value=acl2 ${var.appname}-${var.environment}-${var.tier} (${var.USER})"
   - Key=AppName,Value=${var.appname}
   - Key=Environment,Value=${var.environment}
-  - Key=Subsystem,Value=${var.subsystem}
   - Key=Tier,Value=${var.tier}
   - Key=Purpose,Value=acl2
   - Key=Contact,Value=${var.USER}
@@ -331,7 +324,6 @@ steps.build-${var.environment}-${var.tier}:
   - "Key=Name,Value=${var.appname}-${var.environment}-${var.tier}-${var.elb-0-scheme} ${var.USER}"
   - Key=AppName,Value=${var.appname}
   - Key=Environment,Value=${var.environment}
-  - Key=Subsystem,Value=${var.subsystem}
   - Key=Tier,Value=${var.tier}
   - Key=Contact,Value=${var.USER}
 
@@ -480,7 +472,6 @@ steps.build-${var.environment}-${var.tier}:
   - --tags
   - "ResourceId=${var.appname}-${var.environment}-${var.tier}-blue,ResourceType=auto-scaling-group,Key=AppName,Value=${var.appname},PropagateAtLaunch=true"
   - "ResourceId=${var.appname}-${var.environment}-${var.tier}-blue,ResourceType=auto-scaling-group,Key=Environment,Value=${var.environment},PropagateAtLaunch=true"
-  - "ResourceId=${var.appname}-${var.environment}-${var.tier}-blue,ResourceType=auto-scaling-group,Key=Subsystem,Value=${var.subsystem},PropagateAtLaunch=true"
   - "ResourceId=${var.appname}-${var.environment}-${var.tier}-blue,ResourceType=auto-scaling-group,Key=Tier,Value=${var.tier},PropagateAtLaunch=true"
   - "ResourceId=${var.appname}-${var.environment}-${var.tier}-blue,ResourceType=auto-scaling-group,Key=Pool,Value=blue,PropagateAtLaunch=true"
   - "ResourceId=${var.appname}-${var.environment}-${var.tier}-blue,ResourceType=auto-scaling-group,Key=Name,Value=${var.appname}-${var.environment}-${var.tier}-blue,PropagateAtLaunch=true"
@@ -513,7 +504,6 @@ steps.build-${var.environment}-${var.tier}:
   - --tags
   - "ResourceId=${var.appname}-${var.environment}-${var.tier}-green,ResourceType=auto-scaling-group,Key=AppName,Value=${var.appname},PropagateAtLaunch=true"
   - "ResourceId=${var.appname}-${var.environment}-${var.tier}-green,ResourceType=auto-scaling-group,Key=Environment,Value=${var.environment},PropagateAtLaunch=true"
-  - "ResourceId=${var.appname}-${var.environment}-${var.tier}-green,ResourceType=auto-scaling-group,Key=Subsystem,Value=${var.subsystem},PropagateAtLaunch=true"
   - "ResourceId=${var.appname}-${var.environment}-${var.tier}-green,ResourceType=auto-scaling-group,Key=Tier,Value=${var.tier},PropagateAtLaunch=true"
   - "ResourceId=${var.appname}-${var.environment}-${var.tier}-green,ResourceType=auto-scaling-group,Key=Pool,Value=green,PropagateAtLaunch=true"
   - "ResourceId=${var.appname}-${var.environment}-${var.tier}-green,ResourceType=auto-scaling-group,Key=Name,Value=${var.appname}-${var.environment}-${var.tier}-green,PropagateAtLaunch=true"
