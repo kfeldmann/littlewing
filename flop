@@ -12,6 +12,7 @@ import os
 import re
 import subprocess
 from urllib import quote, unquote
+import time
 
 AWSCLI = os.environ.get('AWSCLI', 'aws')
 filename = '(none)'
