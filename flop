@@ -201,6 +201,13 @@ def store_output(name, outdict):
     f.close()
     return None
 
+def clear_all_output():
+    "Move all output aside, effectively clearing it."
+    ts = time.strftime('%Y%m%d%H%M%S', time.localtime())
+    os.rename('.terraflop-output', '.terraflop-output-cleared-%s' % ts)
+    os.mkdir('.terraflop-output')
+    return None
+
 def varsub_tuple(intuple):
     "Substitute variables in each element of a tuple."
     if intuple == None:
@@ -335,6 +342,11 @@ for in_file in input_files:
                             _wrn('%s %s' \
                              % ('Print statements can only use string',
                                 'arguments (with or without variables).'))
+                        continue
+                    if rsrc_pathname == 'clear-all-output':
+                        if step[step_key]:
+                            _inf('Running %s' % rsrc_pathname)
+                            clear_all_output()
                         continue
                     if rsrc_pathname == 'region':
                         region = varsub(step[step_key])
