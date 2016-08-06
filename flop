@@ -13,7 +13,7 @@ import re
 import subprocess
 from urllib import quote, unquote
 
-AWSCLI = os.environ.get('AWSCLI', '/usr/bin/aws')
+AWSCLI = os.environ.get('AWSCLI', 'aws')
 filename = '(none)'
 lineno = '(none)'
 stepno = '(none)'
@@ -291,8 +291,10 @@ for in_file in input_files:
     for k in yd.keys():
         if k == 'region':
             region = varsub(yd[k])
+            var['REGION'] = region
         elif k == 'profile':
             profile = varsub(yd[k])
+            var['PROFILE'] = profile
 
     # Make the targets in a target-group run in order
     if target and target in target_groups.keys():
