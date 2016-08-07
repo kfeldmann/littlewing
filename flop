@@ -125,6 +125,9 @@ def varsub(val):
         needle = s.group(0).replace('$', r'\$')
         val = re.sub(needle, __varsub(s.group(1)), val)
         i += 1
+    # Un-escape $\{ --> ${, and $\\{ --> $\{
+    val = val.replace(r'$\\{', r'${')
+    val = val.replace(r'$\\\{', r'$\{')
     return val
 
 def aws_call(region, profile, cmdtuple, argtuple):
@@ -259,14 +262,20 @@ for in_file in input_files:
     lineno = '(yaml)'
     yd = yaml.load(f)
     f.close()
-    # Have to make sure we load all the vars, target-groups
-    # and default-target before setting region/profile or
+    # Have to make sure we load all the vars, target-groups,
+    # default-target, and set region/profile before
     # running the steps.
     if listing:
         _inf('File: %s' % filename)
     for k in yd.keys():
         lineno = '(%s...)' % str(k)[:10]
-        if k[:4] == 'var.':
+        if k == 'region':
+            region = varsub(yd[k])
+            var['REGION'] = region
+        elif k == 'profile':
+            profile = varsub(yd[k])
+            var['PROFILE'] = profile
+        elif k[:4] == 'var.':
             if isinstance(yd[k], basestring):
                 var[k[4:]] = varsub(yd[k])
             elif isinstance(yd[k], int):
@@ -294,15 +303,6 @@ for in_file in input_files:
                 if listing:
                     _inf('[%s]: %s' \
                          % (tgname, ', '.join(target_groups[tgname])))
-
-    # Set region/profile (if found)
-    for k in yd.keys():
-        if k == 'region':
-            region = varsub(yd[k])
-            var['REGION'] = region
-        elif k == 'profile':
-            profile = varsub(yd[k])
-            var['PROFILE'] = profile
 
     # Make the targets in a target-group run in order
     if target and target in target_groups.keys():
