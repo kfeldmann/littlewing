@@ -309,10 +309,13 @@ for in_file in input_files:
         elif k[:4] == 'var.':
             if isinstance(yd[k], basestring):
                 var[k[4:]] = varsub(yd[k])
+                _dbg('Set string var[%s] = "%s"' % (k[4:], var[k[4:]]))
             elif isinstance(yd[k], int):
                 var[k[4:]] = str(yd[k])
+                _dbg('Set int var[%s] = "%s"' % (k[4:], var[k[4:]]))
             else:
                 var[k[4:]] = yd[k]
+                _dbg('Set other var[%s] = "%s"' % (k[4:], var[k[4:]]))
         elif k == 'default-target':
             if not target:
                 if isinstance(yd[k], basestring):
@@ -382,15 +385,24 @@ for in_file in input_files:
                         continue
                     if rsrc_pathname == 'region':
                         region = varsub(step[step_key])
+                        var['REGION'] = region
                         continue
                     if rsrc_pathname == 'profile':
                         profile = varsub(step[step_key])
+                        var['PROFILE'] = profile
                         continue
                     if rsrc_pathname[:4] == 'var.':
-                        if isinstance(yd[k], basestring):
-                            var[k[4:]] = varsub(yd[k])
+                        ky = rsrc_pathname[4:]
+                        rawval = step[step_key]
+                        if isinstance(rawval, basestring):
+                            var[ky] = varsub(rawval)
+                            _dbg('Set string var[%s] = "%s"' % (ky, var[ky]))
+                        elif isinstance(rawval, int):
+                            var[ky] = str(rawval)
+                            _dbg('Set int var[%s] = "%s"' % (ky, var[ky]))
                         else:
-                            var[k[4:]] = yd[k]
+                            var[ky] = rawval
+                            _dbg('Set other var[%s] = "%s"' % (ky, var[ky]))
                         continue
                     if os.path.exists('.terraflop-output/%s' \
                                      % rsrc_pathname):
