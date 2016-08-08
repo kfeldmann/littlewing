@@ -156,7 +156,7 @@ def varsub(val):
         needle = s.group(0).replace('$', r'\$')
         val = re.sub(needle, __varsub(s.group(1)), val)
         i += 1
-    # Un-escape $\{ --> ${, and $\\{ --> $\{
+    # Un-escape $\\{ --> ${, and $\\\{ --> $\{
     val = val.replace(r'$\\{', r'${')
     val = val.replace(r'$\\\{', r'$\{')
     return val
@@ -252,7 +252,6 @@ def varsub_tuple(intuple):
         outtuple.append(varsub(item))
     return outtuple
 
-
 ### main ###
 
 if len(sys.argv) > 2 \
@@ -338,6 +337,23 @@ for in_file in input_files:
                     _inf('[%s]: %s' \
                          % (tgname, ', '.join(target_groups[tgname])))
 
+    # List targets
+    if listing:
+        if not default_found:
+            _inf('Default target: (all steps)')
+        for k in yd.keys():
+            if k[:5] == 'steps':
+                tgt = varsub(k[6:])
+                if tgt:
+                    _inf(tgt)
+                else:
+                    if default_found:
+                        _inf('(targetless - not reachable since ' \
+                            + 'default target has been set)')
+                    else:
+                        _inf('(targetless)')
+        continue
+
     # Make the targets in a target-group run in order
     if target and target in target_groups.keys():
         goals = target_groups[target]
@@ -349,16 +365,6 @@ for in_file in input_files:
         for k in yd.keys():
             if k[:5] == 'steps':
                 tgt = varsub(k[6:])
-                if listing:
-                    if tgt:
-                        _inf(tgt)
-                    else:
-                        if default_found:
-                            _inf('(targetless - not reachable since ' \
-                                 + 'default target has been set)')
-                        else:
-                            _inf('(targetless)')
-                    continue
                 if goal and tgt != goal:
                     _dbg('Skipping %s (target: %s, goal: %s)' \
                          % (tgt, target, goal))
@@ -434,7 +440,4 @@ for in_file in input_files:
                         response = subprocess.call(args)
                     else:
                         _err('Unrecognized provider: %s' % words[0])
-    if listing:
-        if not default_found:
-            _inf('Default target: (all steps)')
 
