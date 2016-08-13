@@ -6,20 +6,24 @@ Terraflop supports only AWS. It leverages
 [aws-cli](https://aws.amazon.com/cli/), and litterally can do
 anything that aws-cli can do.
 
-## How does it work
+## How it works
 
 To put it simply, Terraflop runs aws-cli commands that you specify
-in your configuration, and stores the output (typically the output
-contains all of the details of the resource created or referenced by
-the command) so that subsequent commands can make use of that data.
-For example, imagine you're using
+in your configuration. It stores the output of those commands so
+that subsequent commands
+can make use of that data. The output of each command typically contains
+all of the attributes of the resource created or referenced by that command.
+
+Imagine you're using
 aws-cli by itself. You create a VPC. You create an Internet Gateway. Next, to
-attach the gateway to the VPC you will need the ID of each.
-If you want to automate the setup of these items, then your _automation_
-needs to be able to remember these IDs. Terraflop is designed to
+attach the gateway to the VPC you will need the ID of each. You scroll up
+in your terminal looking for those values in the output of your previous commands...
+
+If you want to _automate_ the setup of these items, then it is your _software_
+that needs to be able to look up these IDs. Terraflop is designed to
 do exactly that.
 
-Here is what that exercise looks like in Terraflop:
+Here is what the above exercise looks like in Terraflop:
 
 ```YAML
 - aws.ec2.create-vpc.main:
