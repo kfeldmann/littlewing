@@ -35,7 +35,7 @@ var.region: us-west-2
 var.appname: test-site
 var.ssh-key-name: test-site
 
-var.vpc-name: ${var.appname}
+var.vpc-name: ~{var.appname}
 var.vpc-cidr: 10.0.0.0/16
 var.az_letter_0: a
 var.az_letter_1: b
@@ -52,10 +52,10 @@ var.subnets:
 # Named IP ranges to use in security group rules
 var.developer-cidr: x.x.x.x/x # <-- Put your location's egress IP range here
 
-profile: ${var.profile}
-region: ${var.region}
+profile: ~{var.profile}
+region: ~{var.region}
 
 steps.build:
-- aws.ec2.describe-prefix-lists.${var.region}-s3:
+- aws.ec2.describe-prefix-lists.~{var.region}-s3:
   - --filters
-  - Name=prefix-list-name,Values=com.amazonaws.${var.region}.s3
+  - Name=prefix-list-name,Values=com.amazonaws.~{var.region}.s3

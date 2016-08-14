@@ -34,9 +34,9 @@ Here is what the above exercise looks like in Terraflop:
 
 - aws.ec2.attach-internet-gateway.main:
   - --internet-gateway-id
-  - ${aws.ec2.create-internet-gateway.main.InternetGateway.InternetGatewayId}
+  - ~{aws.ec2.create-internet-gateway.main.InternetGateway.InternetGatewayId}
   - --vpc-id
-  - ${aws.ec2.create-vpc.main.Vpc.VpcId}
+  - ~{aws.ec2.create-vpc.main.Vpc.VpcId}
 ```
 
 With this basic capability, quite a lot can be achieved. You can
@@ -139,7 +139,7 @@ value.
 Example:
 
 ```YAML
-- print: "URL: http://${aws.elb.create-load-balancer.dev-web-0.DNSName}/"
+- print: "URL: http://~{aws.elb.create-load-balancer.dev-web-0.DNSName}/"
 ```
 
 For each step, Terraflop first checks the output directory
@@ -188,20 +188,20 @@ var.subnets:
 To dereference a string variable, use:
 
 ```
-${var.NAME}
+~{var.NAME}
 ```
 
 To dereference one item in a map variable, use:
 
 ```
-${var.NAME.KEY}
+~{var.NAME.KEY}
 ```
 
 To dereference an attribute from the output of a previous command,
 use the following syntax:
 
 ```
-${aws.CATEGORY.COMMAND.NAME.STRUCTURE}
+~{aws.CATEGORY.COMMAND.NAME.STRUCTURE}
 ```
 
 where STRUCTURE is the structure from the aws-returned json, converted
@@ -211,15 +211,15 @@ to indicate elements of lists.
 Examples:
 
 ```
-${aws.ec2.create-vpc.main.Vpc.VpcId}
-${aws.ec2.describe-images.dev-website-web.Images.0.ImageId}
-${aws.ec2.describe-images.dev-website-web.Images.0.BlockDeviceMappings.0.DeviceName}
+~{aws.ec2.create-vpc.main.Vpc.VpcId}
+~{aws.ec2.describe-images.dev-website-web.Images.0.ImageId}
+~{aws.ec2.describe-images.dev-website-web.Images.0.BlockDeviceMappings.0.DeviceName}
 ```
 
 Variable dereferencing can be nested, such as:
 
 ```
-${aws.ec2.create-vpc.${var.environment}.Vpc.VpcId}
+~{aws.ec2.create-vpc.~{var.environment}.Vpc.VpcId}
 ```
 
 The inner-most (and left-most) variable will be dereferenced first,

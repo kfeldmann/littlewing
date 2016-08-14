@@ -4,7 +4,7 @@
 # - flowlog group (app-level)
 # - default network ACL tagged as 'blacklist'
 # - everything tagged with appname, contact
-# - VPC name is ${var.appname}
+# - VPC name is ~{var.appname}
 
 # Prerequisites
 # - (none)
@@ -50,76 +50,76 @@
 
 steps.build:
 
-- aws.ec2.create-vpc.${var.appname}:
+- aws.ec2.create-vpc.~{var.appname}:
   - --cidr-block
-  - ${var.vpc-cidr}
+  - ~{var.vpc-cidr}
 
 - aws.ec2.create-tags.vpc:
   - --resources
-  - ${aws.ec2.create-vpc.${var.appname}.Vpc.VpcId}
+  - ~{aws.ec2.create-vpc.~{var.appname}.Vpc.VpcId}
   - --tags
-  - "Key=Name,Value=${var.appname} (${var.USER})"
-  - Key=AppName,Value=${var.appname}
-  - Key=Contact,Value=${var.USER}
+  - "Key=Name,Value=~{var.appname} (~{var.USER})"
+  - Key=AppName,Value=~{var.appname}
+  - Key=Contact,Value=~{var.USER}
 
-- aws.ec2.create-internet-gateway.${var.appname}: null
+- aws.ec2.create-internet-gateway.~{var.appname}: null
 
 - aws.ec2.create-tags.internet-gateway:
   - --resources
-  - ${aws.ec2.create-internet-gateway.${var.appname}.InternetGateway.InternetGatewayId}
+  - ~{aws.ec2.create-internet-gateway.~{var.appname}.InternetGateway.InternetGatewayId}
   - --tags
-  - "Key=Name,Value=${var.appname} (${var.USER})"
-  - Key=AppName,Value=${var.appname}
-  - Key=Contact,Value=${var.USER}
+  - "Key=Name,Value=~{var.appname} (~{var.USER})"
+  - Key=AppName,Value=~{var.appname}
+  - Key=Contact,Value=~{var.USER}
 
-- aws.ec2.attach-internet-gateway.${var.appname}:
+- aws.ec2.attach-internet-gateway.~{var.appname}:
   - --internet-gateway-id
-  - ${aws.ec2.create-internet-gateway.${var.appname}.InternetGateway.InternetGatewayId}
+  - ~{aws.ec2.create-internet-gateway.~{var.appname}.InternetGateway.InternetGatewayId}
   - --vpc-id
-  - ${aws.ec2.create-vpc.${var.appname}.Vpc.VpcId}
+  - ~{aws.ec2.create-vpc.~{var.appname}.Vpc.VpcId}
 
 # Role for flow logging
-- aws.iam.create-role.${var.appname}-vpc-flow-log-role:
+- aws.iam.create-role.~{var.appname}-vpc-flow-log-role:
   - --role-name
-  - ${var.appname}-vpc-flow-log-role
+  - ~{var.appname}-vpc-flow-log-role
   - --assume-role-policy-document
   - |
     {"Version":"2012-10-17","Statement":[{"Sid":"","Effect":"Allow","Principal":{"Service":"vpc-flow-logs.amazonaws.com"},"Action":"sts:AssumeRole"}]}
 
-- aws.iam.put-role-policy.${var.appname}-vpc-flow-log-policy:
+- aws.iam.put-role-policy.~{var.appname}-vpc-flow-log-policy:
   - --role-name
-  - ${var.appname}-vpc-flow-log-role
+  - ~{var.appname}-vpc-flow-log-role
   - --policy-name
-  - ${var.appname}-vpc-flow-log-policy
+  - ~{var.appname}-vpc-flow-log-policy
   - --policy-document
   - |
     {"Version":"2012-10-17","Statement":[{"Action":["logs:CreateLogGroup","logs:CreateLogStream","logs:PutLogEvents","logs:DescribeLogGroups","logs:DescribeLogStreams"],"Effect":"Allow","Resource":"*"}]}
 
-- aws.ec2.create-flow-logs.${var.appname}:
+- aws.ec2.create-flow-logs.~{var.appname}:
   - --resource-ids
-  - ${aws.ec2.create-vpc.${var.appname}.Vpc.VpcId}
+  - ~{aws.ec2.create-vpc.~{var.appname}.Vpc.VpcId}
   - --resource-type
   - VPC
   - --traffic-type
   - ALL
   - --log-group-name
-  - ${var.appname}
+  - ~{var.appname}
   - --deliver-logs-permission-arn
-  - ${aws.iam.create-role.${var.appname}-vpc-flow-log-role.Role.Arn}
+  - ~{aws.iam.create-role.~{var.appname}-vpc-flow-log-role.Role.Arn}
 
 # Tag the default Network ACL as the "Blacklist" ACL
 # (to be used to block attackers)
 - aws.ec2.describe-network-acls.blacklist-acl:
   - --filters
   - Name=default,Values=true
-  - Name=vpc-id,Values=${aws.ec2.create-vpc.${var.appname}.Vpc.VpcId}
+  - Name=vpc-id,Values=~{aws.ec2.create-vpc.~{var.appname}.Vpc.VpcId}
 
 - aws.ec2.create-tags.blacklist-acl:
   - --resources
-  - ${aws.ec2.describe-network-acls.blacklist-acl.NetworkAcls.0.NetworkAclId}
+  - ~{aws.ec2.describe-network-acls.blacklist-acl.NetworkAcls.0.NetworkAclId}
   - --tags
-  - "Key=Name,Value=blacklist - ${var.appname} (${var.USER})"
-  - Key=AppName,Value=${var.appname}
+  - "Key=Name,Value=blacklist - ~{var.appname} (~{var.USER})"
+  - Key=AppName,Value=~{var.appname}
   - Key=Purpose,Value=blacklist
-  - Key=Contact,Value=${var.USER}
+  - Key=Contact,Value=~{var.USER}
 

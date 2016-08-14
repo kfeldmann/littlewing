@@ -32,64 +32,64 @@
 
 target-groups:
   build:
-  - build-${var.environment}-${var.tier}
-  build-${var.environment}:
-  - build-${var.environment}-${var.tier}
+  - build-~{var.environment}-~{var.tier}
+  build-~{var.environment}:
+  - build-~{var.environment}-~{var.tier}
 
-steps.build-${var.environment}-${var.tier}:
+steps.build-~{var.environment}-~{var.tier}:
 
 ### ELB Ingress ========================================================
 #   web from developer's location
-- aws.ec2.authorize-security-group-ingress.${var.environment}-${var.tier}-elb-0:
+- aws.ec2.authorize-security-group-ingress.~{var.environment}-~{var.tier}-elb-0:
   - --group-id
-  - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-elb.GroupId}
+  - ~{aws.ec2.create-security-group.~{var.environment}-~{var.tier}-elb.GroupId}
   - --protocol
   - tcp
   - --port
   - 80-80
   - --cidr
-  - ${var.developer-cidr}
+  - ~{var.developer-cidr}
 
 ### ELB Egress =========================================================
 #   web to this tier's instances
-- aws.ec2.authorize-security-group-egress.${var.environment}-${var.tier}-elb-0:
+- aws.ec2.authorize-security-group-egress.~{var.environment}-~{var.tier}-elb-0:
   - --group-id
-  - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-elb.GroupId}
+  - ~{aws.ec2.create-security-group.~{var.environment}-~{var.tier}-elb.GroupId}
   - --protocol
   - tcp
   - --port
   - 80-80
   - --source-group
-  - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-app.GroupId}
+  - ~{aws.ec2.create-security-group.~{var.environment}-~{var.tier}-app.GroupId}
 
 ### Instance Ingress ===================================================
 #   ssh from the developer's location
-- aws.ec2.authorize-security-group-ingress.${var.environment}-${var.tier}-app-0:
+- aws.ec2.authorize-security-group-ingress.~{var.environment}-~{var.tier}-app-0:
   - --group-id
-  - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-app.GroupId}
+  - ~{aws.ec2.create-security-group.~{var.environment}-~{var.tier}-app.GroupId}
   - --protocol
   - tcp
   - --port
   - 22-22
   - --cidr
-  - ${var.developer-cidr}
+  - ~{var.developer-cidr}
 
 #   web from this tier's elb
-- aws.ec2.authorize-security-group-ingress.${var.environment}-${var.tier}-app-1:
+- aws.ec2.authorize-security-group-ingress.~{var.environment}-~{var.tier}-app-1:
   - --group-id
-  - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-app.GroupId}
+  - ~{aws.ec2.create-security-group.~{var.environment}-~{var.tier}-app.GroupId}
   - --protocol
   - tcp
   - --port
   - 80-80
   - --source-group
-  - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-elb.GroupId}
+  - ~{aws.ec2.create-security-group.~{var.environment}-~{var.tier}-elb.GroupId}
 
 ### Instance Egress ====================================================
 #   yum(http) to s3
-- aws.ec2.authorize-security-group-egress.${var.environment}-${var.tier}-s3-0:
+- aws.ec2.authorize-security-group-egress.~{var.environment}-~{var.tier}-s3-0:
   - --group-id
-  - ${aws.ec2.create-security-group.${var.environment}-${var.tier}-s3.GroupId}
+  - ~{aws.ec2.create-security-group.~{var.environment}-~{var.tier}-s3.GroupId}
   - --ip-permissions
   - |
     [
@@ -99,7 +99,7 @@ steps.build-${var.environment}-${var.tier}:
         "ToPort": 80,
         "PrefixListIds": [
           {
-            "PrefixListId": "${aws.ec2.describe-prefix-lists.${var.region}-s3.PrefixLists.0.PrefixListId}"
+            "PrefixListId": "~{aws.ec2.describe-prefix-lists.~{var.region}-s3.PrefixLists.0.PrefixListId}"
           }
         ]
       }
