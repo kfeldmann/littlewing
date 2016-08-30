@@ -394,7 +394,10 @@ for in_file in input_files:
                 % (tgname, ', '.join(target_groups[tgname])))
         for k in yd.keys():
             if k[:5] == 'steps':
-                tgt = varsub(k[6:])
+                try:
+                    tgt = varsub(k[6:])
+                except ValueError as ex:
+                    _err(str(ex))
                 if tgt:
                     _inf(tgt)
                 else:
@@ -415,7 +418,10 @@ for in_file in input_files:
     for goal in goals:
         for k in yd.keys():
             if k[:5] == 'steps':
-                tgt = varsub(k[6:])
+                try:
+                    tgt = varsub(k[6:])
+                except ValueError as ex:
+                    _err(str(ex))
                 if goal and tgt != goal:
                     _dbg('Skipping %s (target: %s, goal: %s)' \
                          % (tgt, target, goal))
@@ -426,10 +432,16 @@ for in_file in input_files:
                     stepno += 1
                     step_key = step.keys()[0]
                     lineno = '(%s)' % step_key
-                    rsrc_pathname = varsub(step_key)
+                    try:
+                        rsrc_pathname = varsub(step_key)
+                    except ValueError as ex:
+                        _err(str(ex))
                     if rsrc_pathname == 'print':
                         if isinstance(step[step_key], basestring):
-                            print varsub(step[step_key])
+                            try:
+                                print varsub(step[step_key])
+                            except ValueError as ex:
+                                _err(str(ex))
                         else:
                             _wrn('%s %s' \
                              % ('Print statements can only use string',
@@ -441,18 +453,27 @@ for in_file in input_files:
                             clear_all_output()
                         continue
                     if rsrc_pathname == 'region':
-                        region = varsub(step[step_key])
+                        try:
+                            region = varsub(step[step_key])
+                        except ValueError as ex:
+                            _err(str(ex))
                         var['REGION'] = region
                         continue
                     if rsrc_pathname == 'profile':
-                        profile = varsub(step[step_key])
+                        try:
+                            profile = varsub(step[step_key])
+                        except ValueError as ex:
+                            _err(str(ex))
                         var['PROFILE'] = profile
                         continue
                     if rsrc_pathname[:4] == 'var.':
                         ky = rsrc_pathname[4:]
                         rawval = step[step_key]
                         if isinstance(rawval, basestring):
-                            var[ky] = varsub(rawval)
+                            try:
+                                var[ky] = varsub(rawval)
+                            except ValueError as ex:
+                                _err(str(ex))
                             _dbg('Set string var[%s] = "%s"' % (ky, var[ky]))
                         elif isinstance(rawval, int):
                             var[ky] = str(rawval)
