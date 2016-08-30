@@ -366,13 +366,21 @@ for in_file in input_files:
                         _wrn("'target-groups: %s' must be a list." % tgname)
                         continue
                     try:
-                        target_groups[tgname] = varsub_tuple(yd[k][tgname])
+                        tgn = varsub(tgname)
                     except ValueError as ex:
                         if z >= 10:
                             _err(str(ex))
                         else:
                             vardep_keep_going = True
-        if (z >= 10) or not vardep_keep_going:
+                    else:
+                        try:
+                            target_groups[tgname] = varsub_tuple(yd[k][tgname])
+                        except ValueError as ex:
+                            if z >= 10:
+                                _err(str(ex))
+                            else:
+                                vardep_keep_going = True
+        if (z >= 10) or (vardep_keep_going == False):
             break
 
     # List targets
