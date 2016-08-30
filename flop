@@ -372,7 +372,7 @@ for in_file in input_files:
                             _err(str(ex))
                         else:
                             vardep_keep_going = True
-        if not vardep_keep_going:
+        if (z >= 10) or not vardep_keep_going:
             break
 
     # List targets
