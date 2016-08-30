@@ -37,4 +37,4 @@ target-groups:
   - build-~{var.environment}-~{var.tier}
 
 steps.build-~{var.environment}-~{var.tier}:
-- print: "URL: http://~{aws.elb.create-load-balancer.dev-website-web-0.DNSName}/"
+- print: "URL: http://~{aws.elb.create-load-balancer.~{var.environment}-~{var.tier}-0.DNSName}/"

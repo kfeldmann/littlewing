@@ -469,9 +469,9 @@ steps.build-~{var.environment}-~{var.tier}:
   - ~{var.green-image-name}
   - --encrypted
 
-- aws.iam.create-role.~{var.environment}-~{var.tier}:
+- aws.iam.create-role.~{var.environment}-~{var.tier}-blue:
   - --role-name
-  - ~{var.appname}-~{var.environment}-~{var.tier}
+  - ~{var.appname}-~{var.environment}-~{var.tier}-blue
   - --assume-role-policy-document
   - |
     {
@@ -487,31 +487,59 @@ steps.build-~{var.environment}-~{var.tier}:
       ]
     }
 
-- aws.iam.put-role-policy.~{var.environment}-~{var.tier}-~{var.blue-version}:
+- aws.iam.create-role.~{var.environment}-~{var.tier}-green:
   - --role-name
-  - ~{var.appname}-~{var.environment}-~{var.tier}
+  - ~{var.appname}-~{var.environment}-~{var.tier}-green
+  - --assume-role-policy-document
+  - |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "ec2.amazonaws.com"
+          },
+          "Action": "sts:AssumeRole"
+        }
+      ]
+    }
+
+- aws.iam.put-role-policy.~{var.environment}-~{var.tier}-blue-~{var.blue-version}:
+  - --role-name
+  - ~{var.appname}-~{var.environment}-~{var.tier}-blue
   - --policy-name
-  - ~{var.appname}-~{var.environment}-~{var.tier}
+  - ~{var.appname}-~{var.environment}-~{var.tier}-blue
   - --policy-document
   - ~{var.blue-instance-role-policy}
 
-- aws.iam.put-role-policy.~{var.environment}-~{var.tier}-~{var.green-version}:
+- aws.iam.put-role-policy.~{var.environment}-~{var.tier}-green-~{var.green-version}:
   - --role-name
-  - ~{var.appname}-~{var.environment}-~{var.tier}
+  - ~{var.appname}-~{var.environment}-~{var.tier}-green
   - --policy-name
-  - ~{var.appname}-~{var.environment}-~{var.tier}
+  - ~{var.appname}-~{var.environment}-~{var.tier}-green
   - --policy-document
   - ~{var.green-instance-role-policy}
 
-- aws.iam.create-instance-profile.~{var.environment}-~{var.tier}:
+- aws.iam.create-instance-profile.~{var.environment}-blue-~{var.tier}:
   - --instance-profile-name
-  - ~{var.appname}-~{var.environment}-~{var.tier}
+  - ~{var.appname}-~{var.environment}-~{var.tier}-blue
 
-- aws.iam.add-role-to-instance-profile.~{var.environment}-~{var.tier}:
+- aws.iam.create-instance-profile.~{var.environment}-green-~{var.tier}:
   - --instance-profile-name
-  - ~{var.appname}-~{var.environment}-~{var.tier}
+  - ~{var.appname}-~{var.environment}-~{var.tier}-green
+
+- aws.iam.add-role-to-instance-profile.~{var.environment}-blue-~{var.tier}:
+  - --instance-profile-name
+  - ~{var.appname}-~{var.environment}-~{var.tier}-blue
   - --role-name
-  - ~{var.appname}-~{var.environment}-~{var.tier}
+  - ~{var.appname}-~{var.environment}-~{var.tier}-blue
+
+- aws.iam.add-role-to-instance-profile.~{var.environment}-green-~{var.tier}:
+  - --instance-profile-name
+  - ~{var.appname}-~{var.environment}-~{var.tier}-green
+  - --role-name
+  - ~{var.appname}-~{var.environment}-~{var.tier}-green
 
 - exec.sleep.10-wait-for-role-~{var.environment}-~{var.tier}:
   - 10
@@ -534,7 +562,7 @@ steps.build-~{var.environment}-~{var.tier}:
   - --block-device-mappings
   - '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":~{var.blue-root-volume-size}}}]'
   - --iam-instance-profile
-  - ~{var.appname}-~{var.environment}-~{var.tier}
+  - ~{var.appname}-~{var.environment}-~{var.tier}-blue
 
 - aws.autoscaling.create-launch-configuration.~{var.environment}-~{var.tier}-blue-~{var.blue-version}:
   - --launch-configuration-name
@@ -553,7 +581,7 @@ steps.build-~{var.environment}-~{var.tier}:
   - --block-device-mappings
   - '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":~{var.blue-root-volume-size}}}]'
   - --iam-instance-profile
-  - ~{var.appname}-~{var.environment}-~{var.tier}
+  - ~{var.appname}-~{var.environment}-~{var.tier}-blue
 
 - aws.autoscaling.create-launch-configuration.~{var.environment}-~{var.tier}-green-~{var.green-version}:
   - --launch-configuration-name
@@ -572,7 +600,7 @@ steps.build-~{var.environment}-~{var.tier}:
   - --block-device-mappings
   - '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":~{var.green-root-volume-size}}}]'
   - --iam-instance-profile
-  - ~{var.appname}-~{var.environment}-~{var.tier}
+  - ~{var.appname}-~{var.environment}-~{var.tier}-green
 
 - aws.autoscaling.create-auto-scaling-group.~{var.environment}-~{var.tier}-blue:
   - --auto-scaling-group-name

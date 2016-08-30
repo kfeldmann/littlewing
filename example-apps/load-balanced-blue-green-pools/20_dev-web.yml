@@ -45,7 +45,7 @@ var.green-scale-max: 0
 
 var.elb-0-scheme: internet-facing # (internet-facing | internal)
 var.elb-0-idle-timeout: 15 # 1-3600 seconds
-var.elb-0-connection-draining-timeout: 5
+var.elb-0-connection-draining-timeout: 15
 var.elb-0-healthcheck-url: "http:80/" # proto ":" port [path]
 var.elb-0-healthcheck-interval: 60 # 5 to 300 sec
 var.elb-0-healthcheck-timeout: 15 # 2 to 60 sec (must be < healthcheck-interval)
@@ -71,6 +71,15 @@ var.blue-user-data: |
     permissions: '0444'
     content: Hello from the blue pool.
   runcmd:
+  - /bin/sed --in-place -e "s/PermitRootLogin forced-commands-only/PermitRootLogin no/" /etc/ssh/sshd_config
+  - VERSION=$(grep ^VERSION= /etc/os-release | cut -d\" -f2)
+  - /bin/sed --in-place -e "s@releasever=latest@releasever=${VERSION}@" /etc/yum.conf
+  - /bin/sed --in-place -e "s@^logfile=/var/log/yum.log@syslog_ident=yum@"
+  - /usr/bin/yum clean all
+  - /usr/bin/yum -q -y --security update
+  - /sbin/chkconfig sendmail off
+  - /sbin/service sendmail stop
+  - /sbin/chkconfig httpd on
   - /sbin/service httpd start
 
 var.green-image-owner: amazon
@@ -88,6 +97,15 @@ var.green-user-data: |
     permissions: '0444'
     content: Hello from the green pool.
   runcmd:
+  - /bin/sed --in-place -e "s/PermitRootLogin forced-commands-only/PermitRootLogin no/" /etc/ssh/sshd_config
+  - VERSION=$(grep ^VERSION= /etc/os-release | cut -d\" -f2)
+  - /bin/sed --in-place -e "s@releasever=latest@releasever=${VERSION}@" /etc/yum.conf
+  - /bin/sed --in-place -e "s@^logfile=/var/log/yum.log@syslog_ident=yum@"
+  - /usr/bin/yum clean all
+  - /usr/bin/yum -q -y --security update
+  - /sbin/chkconfig sendmail off
+  - /sbin/service sendmail stop
+  - /sbin/chkconfig httpd on
   - /sbin/service httpd start
 
 var.blue-instance-role-policy: |
