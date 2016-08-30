@@ -374,7 +374,7 @@ for in_file in input_files:
                             vardep_keep_going = True
                     else:
                         try:
-                            target_groups[tgname] = varsub_tuple(yd[k][tgname])
+                            target_groups[tgn] = varsub_tuple(yd[k][tgname])
                         except ValueError as ex:
                             if z >= 10:
                                 _err(str(ex))
