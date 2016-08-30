@@ -30,8 +30,8 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 var.appname: target-test
-var.region: us-west-2
-var.profile: my-profile
+region: us-west-2
+profile: my-profile
 
 target-groups:
   all:

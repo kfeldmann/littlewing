@@ -29,7 +29,7 @@
 # - tier
 #
 # - vpc-name (either ~{var.appname} or ~{var.environment})
-# - region
+# - REGION
 # - az-letter-0
 # - az-letter-1
 # - subnets.~{var.environment}-~{var.tier}-~{var.az-letter-0}
@@ -127,7 +127,7 @@ steps.build-~{var.environment}-~{var.tier}:
   - --cidr-block
   - ~{var.subnets.~{var.environment}-~{var.tier}-~{var.az-letter-0}}
   - --availability-zone
-  - ~{var.region}~{var.az-letter-0}
+  - ~{var.REGION}~{var.az-letter-0}
 
 - aws.ec2.create-subnet.~{var.environment}-~{var.tier}-~{var.az-letter-1}:
   - --vpc-id
@@ -135,7 +135,7 @@ steps.build-~{var.environment}-~{var.tier}:
   - --cidr-block
   - ~{var.subnets.~{var.environment}-~{var.tier}-~{var.az-letter-1}}
   - --availability-zone
-  - ~{var.region}~{var.az-letter-1}
+  - ~{var.REGION}~{var.az-letter-1}
 
 - aws.ec2.create-tags.subnets-~{var.environment}-~{var.tier}:
   - --resources
@@ -196,7 +196,7 @@ steps.build-~{var.environment}-~{var.tier}:
   - --vpc-id
   - ~{aws.ec2.create-vpc.~{var.vpc-name}.Vpc.VpcId}
   - --service-name
-  - com.amazonaws.~{var.region}.s3
+  - com.amazonaws.~{var.REGION}.s3
   - --route-table-ids
   - ~{aws.ec2.create-route-table.~{var.environment}-~{var.tier}.RouteTable.RouteTableId}
 
@@ -444,9 +444,9 @@ steps.build-~{var.environment}-~{var.tier}:
   - "Name=name,Values='~{var.blue-image-name}'"
 
 # Copy/encrypt once per region + ami-id
-- aws.ec2.copy-image.~{var.region}-~{aws.ec2.describe-images.~{var.environment}-~{var.tier}-~{var.blue-version}.Images.0.ImageId}:
+- aws.ec2.copy-image.~{var.REGION}-~{aws.ec2.describe-images.~{var.environment}-~{var.tier}-~{var.blue-version}.Images.0.ImageId}:
   - --source-region
-  - ~{var.region}
+  - ~{var.REGION}
   - --source-image-id
   - ~{aws.ec2.describe-images.~{var.environment}-~{var.tier}-~{var.blue-version}.Images.0.ImageId}
   - --name
@@ -460,9 +460,9 @@ steps.build-~{var.environment}-~{var.tier}:
   - "Name=name,Values='~{var.green-image-name}'"
 
 # Copy/encrypt once per region + ami-id
-- aws.ec2.copy-image.~{var.region}-~{aws.ec2.describe-images.~{var.environment}-~{var.tier}-~{var.green-version}.Images.0.ImageId}:
+- aws.ec2.copy-image.~{var.REGION}-~{aws.ec2.describe-images.~{var.environment}-~{var.tier}-~{var.green-version}.Images.0.ImageId}:
   - --source-region
-  - ~{var.region}
+  - ~{var.REGION}
   - --source-image-id
   - ~{aws.ec2.describe-images.~{var.environment}-~{var.tier}-~{var.green-version}.Images.0.ImageId}
   - --name
@@ -537,7 +537,7 @@ steps.build-~{var.environment}-~{var.tier}:
   - --launch-configuration-name
   - ~{var.appname}-~{var.environment}-~{var.tier}-blue-~{var.blue-version}
   - --image-id
-  - ~{aws.ec2.copy-image.~{var.region}-~{aws.ec2.describe-images.~{var.environment}-~{var.tier}-~{var.blue-version}.Images.0.ImageId}.ImageId}
+  - ~{aws.ec2.copy-image.~{var.REGION}-~{aws.ec2.describe-images.~{var.environment}-~{var.tier}-~{var.blue-version}.Images.0.ImageId}.ImageId}
   - --key-name
   - ~{var.ssh-key-name}
   - --security-groups
@@ -556,7 +556,7 @@ steps.build-~{var.environment}-~{var.tier}:
   - --launch-configuration-name
   - ~{var.appname}-~{var.environment}-~{var.tier}-green-~{var.green-version}
   - --image-id
-  - ~{aws.ec2.copy-image.~{var.region}-~{aws.ec2.describe-images.~{var.environment}-~{var.tier}-~{var.green-version}.Images.0.ImageId}.ImageId}
+  - ~{aws.ec2.copy-image.~{var.REGION}-~{aws.ec2.describe-images.~{var.environment}-~{var.tier}-~{var.green-version}.Images.0.ImageId}.ImageId}
   - --key-name
   - ~{var.ssh-key-name}
   - --security-groups
@@ -583,8 +583,8 @@ steps.build-~{var.environment}-~{var.tier}:
   - --max-size
   - ~{var.blue-scale-max}
   - --availability-zones
-  - ~{var.region}~{var.az-letter-0}
-  - ~{var.region}~{var.az-letter-1}
+  - ~{var.REGION}~{var.az-letter-0}
+  - ~{var.REGION}~{var.az-letter-1}
   - --vpc-zone-identifier
   - ~{aws.ec2.create-subnet.~{var.environment}-~{var.tier}-~{var.az-letter-0}.Subnet.SubnetId},~{aws.ec2.create-subnet.~{var.environment}-~{var.tier}-~{var.az-letter-1}.Subnet.SubnetId}
   - --health-check-type
@@ -615,8 +615,8 @@ steps.build-~{var.environment}-~{var.tier}:
   - --max-size
   - ~{var.green-scale-max}
   - --availability-zones
-  - ~{var.region}~{var.az-letter-0}
-  - ~{var.region}~{var.az-letter-1}
+  - ~{var.REGION}~{var.az-letter-0}
+  - ~{var.REGION}~{var.az-letter-1}
   - --vpc-zone-identifier
   - ~{aws.ec2.create-subnet.~{var.environment}-~{var.tier}-~{var.az-letter-0}.Subnet.SubnetId},~{aws.ec2.create-subnet.~{var.environment}-~{var.tier}-~{var.az-letter-1}.Subnet.SubnetId}
   - --health-check-type

@@ -99,7 +99,7 @@ steps.build-~{var.environment}-~{var.tier}:
         "ToPort": 80,
         "PrefixListIds": [
           {
-            "PrefixListId": "~{aws.ec2.describe-prefix-lists.~{var.region}-s3.PrefixLists.0.PrefixListId}"
+            "PrefixListId": "~{aws.ec2.describe-prefix-lists.~{var.REGION}-s3.PrefixLists.0.PrefixListId}"
           }
         ]
       }
