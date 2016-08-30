@@ -513,6 +513,9 @@ steps.build-~{var.environment}-~{var.tier}:
   - --role-name
   - ~{var.appname}-~{var.environment}-~{var.tier}
 
+- exec.sleep.10-wait-for-role-~{var.environment}-~{var.tier}:
+  - 10
+
 # Create asg using stub lc, then switch to the versioned lc
 - aws.autoscaling.create-launch-configuration.~{var.environment}-~{var.tier}-stub:
   - --launch-configuration-name
