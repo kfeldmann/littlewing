@@ -255,7 +255,106 @@ def varsub_tuple(intuple):
         outtuple.append(varsub(item))
     return outtuple
 
-### main ###
+def set_region(value, tries=1, trylimit=1):
+    """
+    Set the global 'region` and var['REGION'] variables
+    using variable substitution.
+    """
+    try:
+        region = varsub(value)
+        var['REGION'] = region
+    except ValueError as ex:
+        if tries >= trylimit:
+            _err(str(ex))
+        else:
+            return False
+    return True
+
+def set_profile(value, tries=1, trylimit=1):
+    """
+    Set the global 'profile` and var['PROFILE'] variables
+    using variable substitution.
+    """
+    try:
+        profile = varsub(value)
+        var['PROFILE'] = profile
+    except ValueError as ex:
+        if tries >= trylimit:
+            _err(str(ex))
+        else:
+            return False
+    return True
+
+def set_var(name, value, tries=1, trylimit=1):
+    "Set global 'var[name]' using variable substitution."
+    if isinstance(value, basestring):
+        try:
+            var[name] = varsub(value)
+            _dbg('Set string var[%s] = "%s"' % (name, var[name]))
+        except ValueError as ex:
+            if tries >= trylimit:
+                _err(str(ex))
+            else:
+                return False
+    elif isinstance(value, int):
+        var[name] = str(value)
+        _dbg('Set int var[%s] = "%s"' % (name, var[name]))
+    else:
+        var[name] = value
+        _dbg('Set other var[%s] = "%s"' % (name, var[name]))
+    return True
+
+def set_default_target(value, tries=1, trylimit=1):
+    """
+    Set global 'target' (once) using variable substitution.
+    
+    Globals:
+    - target
+    - listing
+    - default_found
+    """
+    if not target:
+        if isinstance(value, basestring):
+            try:
+                target = varsub(value)
+                if listing:
+                    default_found = True
+            except ValueError as ex:
+                if tries >= trylimit:
+                    _err(str(ex))
+                else:
+                    return False
+        else:
+            _wrn('Default target must be a string.')
+        return True
+
+def set_target_groups(tgdict, tries=1, trylimit=1):
+    "Set global 'target_groups' using variable substitution."
+    if not isinstance(tgdict, dict):
+        _wrn("'target-groups' must be a dict.")
+        return True
+    for tgname in tgdict.keys():
+        if not isinstance(tgdict[tgname], list):
+            _wrn("'target-groups: %s' must be a list." % tgname)
+            return True
+        try:
+            tgn = varsub(tgname)
+        except ValueError as ex:
+            if tries >= trylimit:
+                _err(str(ex))
+            else:
+                return False
+        else:
+            try:
+                target_groups[tgn] = varsub_tuple(tgdict[tgname])
+            except ValueError as ex:
+                if tries >= trylimit:
+                    _err(str(ex))
+                else:
+                    return False
+    return True
+
+### main ###############################################################
 
 if len(sys.argv) > 2 \
         or  '-?' in sys.argv \
@@ -302,85 +401,30 @@ for in_file in input_files:
     if listing:
         _inf('File: %s' % filename)
 
-    # Try up to 10 passes to resolve variable dependencies
+    # Try up to 'maxtries' passes to resolve variable dependencies
     z = 0
+    maxtries = 10
     vardep_keep_going = False
     while True:
         z += 1
         for k in yd.keys():
             lineno = '(%s...)' % str(k)[:10]
             if k == 'region':
-                try:
-                    region = varsub(yd[k])
-                    var['REGION'] = region
-                except ValueError as ex:
-                    if z >= 10:
-                        _err(str(ex))
-                    else:
-                        vardep_keep_going = True
+                if not set_region(yd[k], z, maxtries):
+                    vardep_keep_going = True
             elif k == 'profile':
-                try:
-                    profile = varsub(yd[k])
-                    var['PROFILE'] = profile
-                except ValueError as ex:
-                    if z >= 10:
-                        _err(str(ex))
-                    else:
-                        vardep_keep_going = True
+                if not set_profile(yd[k], z, maxtries):
+                    vardep_keep_going = True
             elif k[:4] == 'var.':
-                if isinstance(yd[k], basestring):
-                    try:
-                        var[k[4:]] = varsub(yd[k])
-                        _dbg('Set string var[%s] = "%s"' % (k[4:], var[k[4:]]))
-                    except ValueError as ex:
-                        if z >= 10:
-                            _err(str(ex))
-                        else:
-                            vardep_keep_going = True
-                elif isinstance(yd[k], int):
-                    var[k[4:]] = str(yd[k])
-                    _dbg('Set int var[%s] = "%s"' % (k[4:], var[k[4:]]))
-                else:
-                    var[k[4:]] = yd[k]
-                    _dbg('Set other var[%s] = "%s"' % (k[4:], var[k[4:]]))
+                if not set_var(k[4:], yd[k], z, maxtries):
+                    vardep_keep_going = True
             elif k == 'default-target':
-                if not target:
-                    if isinstance(yd[k], basestring):
-                        try:
-                            target = varsub(yd[k])
-                            if listing:
-                                default_found = True
-                        except ValueError as ex:
-                            if z >= 10:
-                                _err(str(ex))
-                            else:
-                                vardep_keep_going = True
-                    else:
-                        _wrn('Default target must be a string.')
+                if not set_default_target(yd[k], z, maxtries):
+                    vardep_keep_going = True
             elif k == 'target-groups':
-                if not isinstance(yd[k], dict):
-                    _wrn("'target-groups' must be a dict.")
-                    continue
-                for tgname in yd[k].keys():
-                    if not isinstance(yd[k][tgname], list):
-                        _wrn("'target-groups: %s' must be a list." % tgname)
-                        continue
-                    try:
-                        tgn = varsub(tgname)
-                    except ValueError as ex:
-                        if z >= 10:
-                            _err(str(ex))
-                        else:
-                            vardep_keep_going = True
-                    else:
-                        try:
-                            target_groups[tgn] = varsub_tuple(yd[k][tgname])
-                        except ValueError as ex:
-                            if z >= 10:
-                                _err(str(ex))
-                            else:
-                                vardep_keep_going = True
-        if (z >= 10) or (vardep_keep_going == False):
+                if not set_target_groups(yd[k], z, maxtries):
+                    vardep_keep_going = True
+        if (z >= maxtries) or (vardep_keep_going == False):
             break
 
     # List targets
@@ -453,34 +497,15 @@ for in_file in input_files:
                             clear_all_output()
                         continue
                     if rsrc_pathname == 'region':
-                        try:
-                            region = varsub(step[step_key])
-                        except ValueError as ex:
-                            _err(str(ex))
-                        var['REGION'] = region
+                        set_region(step[step_key])
                         continue
                     if rsrc_pathname == 'profile':
-                        try:
-                            profile = varsub(step[step_key])
-                        except ValueError as ex:
-                            _err(str(ex))
-                        var['PROFILE'] = profile
+                        set_profile(step[step_key])
                         continue
                     if rsrc_pathname[:4] == 'var.':
                         ky = rsrc_pathname[4:]
                         rawval = step[step_key]
-                        if isinstance(rawval, basestring):
-                            try:
-                                var[ky] = varsub(rawval)
-                            except ValueError as ex:
-                                _err(str(ex))
-                            _dbg('Set string var[%s] = "%s"' % (ky, var[ky]))
-                        elif isinstance(rawval, int):
-                            var[ky] = str(rawval)
-                            _dbg('Set int var[%s] = "%s"' % (ky, var[ky]))
-                        else:
-                            var[ky] = rawval
-                            _dbg('Set other var[%s] = "%s"' % (ky, var[ky]))
+                        set_var(ky, rawval)
                         continue
                     if os.path.exists('.terraflop-output/%s' \
                                      % rsrc_pathname):
