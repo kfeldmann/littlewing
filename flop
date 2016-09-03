@@ -145,6 +145,7 @@ def varsub(val):
     Recursively (to a limit) find variables in the input string
     and call __varsub() to dereference them.
     """
+    global marker
     _dbg('varsub(): starting with val = %s' % val)
     if isinstance(val, None.__class__):
         return val
@@ -152,10 +153,10 @@ def varsub(val):
         return str(val)
     i = 0
     while i < 10:
-        # Do we want to add an argument (or statement
-        # in configurations) to switch between formats?
-        #s = re.search(r'\$\{([^${}]+)\}', val)
-        s = re.search(r'\~\{([^~{}]+)\}', val)
+        if marker == 'dollar':
+            s = re.search(r'\$\{([^${}]+)\}', val)
+        else:
+            s = re.search(r'\~\{([^~{}]+)\}', val)
         try:
             s.group(1)
         except (IndexError, AttributeError):
@@ -165,6 +166,10 @@ def varsub(val):
         needle = s.group(0).replace('$', r'\$')
         val = re.sub(needle, __varsub(s.group(1)), val)
         i += 1
+    if marker == 'dollar':
+        # Un-escape $\\{ --> ${, and $\\\{ --> $\{
+        val = val.replace(r'$\\{', r'${')
+        val = val.replace(r'$\\\{', r'$\{')
     return val
 
 def aws_call(region, profile, cmdtuple, argtuple):
@@ -393,6 +398,7 @@ profile = None
 var = {}
 target_groups = {}
 var['USER'] = os.environ.get('USER', 'terraflop')
+marker = 'tilde'
 
 for in_file in input_files:
     f = open(in_file, 'r')
@@ -400,6 +406,18 @@ for in_file in input_files:
     lineno = '(yaml)'
     yd = yaml.load(f)
     f.close()
+
+    # Attempt to auto-discover the variable marker ('$' or '~')
+    f = open(in_file, 'r')
+    data = f.read()
+    f.close()
+    dollar = data.count('${')
+    tilde = data.count('~{')
+    if dollar > 0 and tilde == 0:
+        marker = 'dollar'
+        _dbg('Setting variable marker to dollar ${}')
+    elif dollar > 0 and tilde > 0:
+        _wrn('Found both ${dollar} and ~{tilde} variable markers!')
 
     # Have to make sure we load all the vars, target-groups,
     # default-target, and set region/profile before
@@ -426,6 +444,7 @@ for in_file in input_files:
             elif k[:4] == 'var.':
                 if not set_var(k[4:], yd[k], z, maxtries):
                     vardep_keep_going = True
+                _dbg('var[%s] is set to %s' % (k[4:], var[k[4:]]))
             elif k == 'default-target':
                 if not set_default_target(yd[k], z, maxtries):
                     vardep_keep_going = True
