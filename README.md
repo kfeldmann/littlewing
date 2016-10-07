@@ -1,29 +1,30 @@
-# Terraflop - Infrastructure Automation
+# Littlewing - Infrastructure Automation
 
-Terraflop is a simple infrastructure automation tool.
+Littlewing is a simple infrastructure automation tool.
 
-Terraflop supports only AWS. It leverages
+Littlewing supports only AWS. It leverages
 [aws-cli](https://aws.amazon.com/cli/), and litterally can do
 anything that aws-cli can do.
 
 ## How it works
 
-To put it simply, Terraflop runs aws-cli commands that you specify
+To put it simply, Littlewing runs aws-cli commands that you specify
 in your configuration. It stores the output of those commands so
 that subsequent commands
 can make use of that data. The output of each command typically contains
 all of the attributes of the resource created or referenced by that command.
 
 Imagine you're using
-aws-cli by itself. You create a VPC. You create an Internet Gateway. Next, to
-attach the gateway to the VPC you will need the ID of each. You scroll up
-in your terminal looking for those values in the output of your previous commands...
+aws-cli by itself. You create a VPC. You create an Internet Gateway. Next,
+to attach the gateway to the VPC you will need the ID of each. You scroll
+up in your terminal looking for those values in the output of your
+previous commands...
 
 If you want to _automate_ the setup of these items, then it is your _software_
-that needs to be able to look up these IDs. Terraflop is designed to
+that needs to be able to look up these IDs. Littlewing is designed to
 do exactly that.
 
-Here is what the above exercise looks like in Terraflop:
+Here is what the above exercise looks like in Littlewing:
 
 ```YAML
 - aws.ec2.create-vpc.main:
@@ -49,21 +50,21 @@ in addition to creating resources.
 - Install and configure aws-cli per Amazon's instructions
 - Install python 2.7
 - Install pyyaml
-- Clone or download Terraflop
-- Put the `flop` command in your path
+- Clone or download Littlewing
+- Put the `lw` command in your path
    - Copy, or symlink it into a directory that is already
      in your path, or...
-   - Extend your path to cover the directory where `flop` resides
+   - Extend your path to cover the directory where `lw` resides
 
 ## Basics
 
-Terraflop has just one command: `flop`. Flop reads all .yml files found
+Littlewing has just one command: `lw`. Lw reads all .yml files found
 in the current directory and reads them in alphabetical order. Each
 file contains variables, steps, or both. After loading all of the
 variables in a file, the steps in that file are executed in the
 order listed.
 
-Terraflop does not figure out ordering for you. To control the
+Littlewing does not figure out ordering for you. To control the
 order of operations, pay attention to the order of your steps and
 files. It is common to name files with a numeric prefix so that
 they sort unambiguously (see `example-apps`).
@@ -77,7 +78,7 @@ they sort unambiguously (see `example-apps`).
 The configuration files use YAML 1.1 (.yml) format. [YAML is a
 standard format documented here](http://yaml.org/spec/1.1/).
 
-In Terraflop, the commands to be run are called steps. Steps are
+In Littlewing, the commands to be run are called steps. Steps are
 constructed using the following structure:
 
 ```YAML
@@ -87,7 +88,7 @@ steps[.TARGET]:
   - ...
 ```
 
-TARGET is an optional label for the step list. If `flop` is then run
+TARGET is an optional label for the step list. If `lw` is then run
 with a target string as its argument, only steps matching that target
 will be examined.
 
@@ -142,8 +143,8 @@ Example:
 - print: "URL: http://~{aws.elb.create-load-balancer.dev-web-0.DNSName}/"
 ```
 
-For each step, Terraflop first checks the output directory
-(`.terraflop-output` in the current working directory) to see if
+For each step, Littlewing first checks the output directory
+(`.lw-output` in the current working directory) to see if
 the step has been run already. If it has run already, it will be
 skipped. Inside each of the output files you will see the attributes
 that can be referenced from subsequent commands.
@@ -154,7 +155,7 @@ has run in the past, prepend the key with a `+` character.
 Print statements, variable assignments, and everything outside of
 any step list will always run every time.
 
-Variables can be used throughout a terraflop configuration. There
+Variables can be used throughout a Littlewing configuration. There
 are two types of variables: strings and maps.
 
 String variables are defined using this syntax:
@@ -227,14 +228,14 @@ working outwards (and right-wards) until the string is variable-free.
 This nesting enables parameterized configurations that are easily cloned
 and/or reused.
 
-You can run `flop` on some initial commands and view the output
+You can run `lw` on some initial commands and view the output
 to copy the references to use in subsequent commands. When you re-run
-`flop`, the previous commands that have already run will be skipped.
+`lw`, the previous commands that have already run will be skipped.
 In this way, your work can be very iterative.
 
 Variables and output are all global. There is no local scope.
 
-There is no special concept of modules in Terraflop, but you can easily
+There is no special concept of modules in Littlewing, but you can easily
 reuse parameterized configurations (see example-apps). The procedure is
 to create a reusable configuration snippet, place it in a commmon directory,
 and then symlink it into your application's configuration directory with
@@ -260,6 +261,6 @@ To make changes in a production setting, take a look at the strategy
 used in the blue/green pools of the 'test-site' example app's web tier.
 By versioning the names of steps that _update_ infrastructure, you can
 change the config,
-bump the version, and then `flop` will see those as new steps which have
+bump the version, and then `lw` will see those as new steps which have
 not yet run. As a side effect, you will have the output of each of your
 previous versions acumulating in the outputs directory.

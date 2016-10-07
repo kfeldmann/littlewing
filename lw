@@ -1,8 +1,8 @@
 #!/usr/bin/python2.7 -O
 
 """
-Terraflop: Simple, powerful infrastructure automation.
-https://github.com/kfeldmann/terraflop
+Littlewing: Simple, powerful infrastructure automation.
+https://github.com/kfeldmann/littlewing
 
 Copyright (c) 2016, Kris Feldmann
 All rights reserved.
@@ -86,7 +86,7 @@ def _dbg(message):
 
 def usage():
     "Write usage statement to stderr and exit(2)."
-    sys.stderr.write('Usage: flop [-l|--list|<target>]\n')
+    sys.stderr.write('Usage: lw [-l|--list|<target>]\n')
     raise SystemExit(2)
 
 def __varsub(in_str):
@@ -118,8 +118,8 @@ def __varsub(in_str):
     else:
         _err('Unknown provider: %s' % words[0])
     try:
-        f = open('.terraflop-output/%s' % fname, 'r')
-        filename = '.terraflop-output/%s' % fname
+        f = open('%s/%s' % (outdir, fname), 'r')
+        filename = '%s/%s' % (outdir, fname)
     except IOError:
         _err('Unknown resource: %s' % fname)
     lineno = 0
@@ -241,7 +241,7 @@ def stringify(path, name, obj):
 def store_output(name, outdict):
     "Stringify and write out the output data from a step."
     try:
-        f = open('.terraflop-output/%s' % name, 'w')
+        f = open('%s/%s' % (outdir, name), 'w')
     except IOError:
         _err('Failed to open output file: %s' % name)
     for line in stringify('', name, outdict):
@@ -252,8 +252,8 @@ def store_output(name, outdict):
 def clear_all_output():
     "Move all output aside, effectively clearing it."
     ts = time.strftime('%Y%m%d%H%M%S', time.localtime())
-    os.rename('.terraflop-output', '.terraflop-output-cleared-%s' % ts)
-    os.mkdir('.terraflop-output')
+    os.rename(outdir, '%s-cleared-%s' % (outdir, ts))
+    os.mkdir('.lw-output') # Use new naming regardless of previous
     return None
 
 def varsub_tuple(intuple):
@@ -429,6 +429,7 @@ if len(sys.argv) > 2 \
 listing = False
 target = None
 default_found = False
+outdir = '.lw-output'
 
 if len(sys.argv) == 2:
     if sys.argv[1] in ('-l', '--list'):
@@ -436,8 +437,12 @@ if len(sys.argv) == 2:
     else:
         target = sys.argv[1]
 
-if not os.path.exists('.terraflop-output'):
-    os.mkdir('.terraflop-output')
+# Legacy support
+if os.path.exists('.terraflop-output'):
+    outdir = '.terraflop-output'
+
+if not os.path.exists(outdir):
+    os.mkdir(outdir)
 
 all_files = os.listdir('.')
 input_files = []
@@ -449,7 +454,7 @@ input_files.sort()
 region = None
 profile = None
 var = {}
-var['USER'] = os.environ.get('USER', 'terraflop')
+var['USER'] = os.environ.get('USER', 'littlewing')
 var['LOOP_INDEX'] = "0"
 target_groups = {}
 marker = 'tilde'
@@ -600,8 +605,8 @@ for in_file in input_files:
                     if rsrc_pathname == 'loop':
                         start_loop(stepno, step[step_key])
                         continue
-                    if os.path.exists('.terraflop-output/%s' \
-                                     % rsrc_pathname):
+                    if os.path.exists('%s/%s' \
+                                     % (outdir, rsrc_pathname)):
                         _dbg('%s has already been run.' % rsrc_pathname)
                         continue
                     if rsrc_pathname[0] == '+':
