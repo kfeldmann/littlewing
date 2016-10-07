@@ -1,0 +1,13 @@
+region: us-west-2
+profile: wbtsaio-dns
+
+steps:
+- print: Starting
+- loop: 3
+- print: "  Outer loop (~{var.LOOP_INDEX} of 3)"
+- loop: 2
+- print: "    Inner loop (~{var.LOOP_INDEX} of 2)"
+- end-loop:
+- end-loop:
+- print: Ending
+
