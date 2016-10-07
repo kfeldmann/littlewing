@@ -32,7 +32,7 @@
 
 steps.sample:
 
-# To cause any step to run every time flop runs, prepend it's
+# To cause any step to run every time lw runs, prepend it's
 # step key with a + character.
 # 
 # The 'exec' provider executes arbitrary commands on your
