@@ -91,6 +91,7 @@ def usage():
 
 def __varsub(in_str):
     "Dereference variables and output references."
+    global filename, lineno
     _dbg('__varsub(): starting with in_str = %s' % in_str)
     words = in_str.split('.')
     _dbg('__varsub(): words = %s' % repr(words))
@@ -145,7 +146,6 @@ def varsub(val):
     Recursively (to a limit) find variables in the input string
     and call __varsub() to dereference them.
     """
-    global marker
     _dbg('varsub(): starting with val = %s' % val)
     if isinstance(val, None.__class__):
         return val
@@ -282,11 +282,11 @@ def set_region(value, tries=1, trylimit=1):
     return True
 
 def set_profile(value, tries=1, trylimit=1):
-    global profile
     """
     Set the global 'profile` and var['PROFILE'] variables
     using variable substitution.
     """
+    global profile
     try:
         profile = varsub(value)
         var['PROFILE'] = profile
@@ -296,6 +296,60 @@ def set_profile(value, tries=1, trylimit=1):
         else:
             return False
     return True
+
+def start_loop(this_stepno, value, tries=1, trylimit=1):
+    """
+    Push the start and count of this loop onto the loop_stack.
+    Use variable substitution for the length.
+    The values in loop_stack[] have the following format:
+    [starting_stepno, loop_count, loop_index]
+    The loop_index value is incremented during the loop
+    execution until it is equal to loop_count.
+    """
+    try:
+        count = varsub(value)
+    except ValueError as ex:
+        if tries >= trylimit:
+            _err(str(ex))
+        else:
+            return False
+    else:
+        try:
+            count = int(count)
+        except ValueError as ex:
+            _err(str(ex))
+        else:
+            _dbg('Pushing loop onto the stack: [%d, %d, 0]' \
+                % (this_stepno, count))
+            loop_stack.append([this_stepno, count, 0])
+    set_loop_index_var()
+    return True
+
+def increment_loop_index():
+    """
+    Increment the loop_index value.
+    Return True if the loop should continue, and False if it has reached
+    the end (index == count).
+    """
+    loop_stack[-1][2] += 1
+    _dbg('Loop status: %d, %d, %d' \
+        % (loop_stack[-1][0], loop_stack[-1][1], loop_stack[-1][2]))
+    if loop_stack[-1][2] >= loop_stack[-1][1]:
+        _dbg('Loop done. Popping from loop_stack.')
+        loop_stack.pop()
+        set_loop_index_var()
+        return False
+    else:
+        _dbg('Loop continuing.')
+        set_loop_index_var()
+        return True
+
+def set_loop_index_var():
+    if len(loop_stack) > 0:
+        var['LOOP_INDEX'] = str(loop_stack[-1][2])
+    else:
+        var['LOOP_INDEX'] = "0"
+    return None
 
 def set_var(name, value, tries=1, trylimit=1):
     "Set global 'var[name]' using variable substitution."
@@ -321,7 +375,6 @@ def set_default_target(value, tries=1, trylimit=1):
     Set global 'target' (once) using variable substitution.
     """
     global target
-    global listing
     global default_found
 
     if not target:
@@ -396,9 +449,11 @@ input_files.sort()
 region = None
 profile = None
 var = {}
-target_groups = {}
 var['USER'] = os.environ.get('USER', 'terraflop')
+var['LOOP_INDEX'] = "0"
+target_groups = {}
 marker = 'tilde'
+loop_stack = []
 
 for in_file in input_files:
     f = open(in_file, 'r')
@@ -500,8 +555,9 @@ for in_file in input_files:
                     continue
                 _dbg('Examining step list %s' % k)
                 stepno = 0
-                for step in yd[k]:
+                while stepno < len(yd[k]):
                     stepno += 1
+                    step = yd[k][stepno - 1] # stepno is 1-based for printing
                     step_key = step.keys()[0]
                     lineno = '(%s)' % step_key
                     try:
@@ -534,6 +590,15 @@ for in_file in input_files:
                         ky = rsrc_pathname[4:]
                         rawval = step[step_key]
                         set_var(ky, rawval)
+                        continue
+                    if rsrc_pathname == 'end-loop':
+                        if len(loop_stack) == 0:
+                            _err('Found "end-loop" outside of any loop.')
+                        if increment_loop_index():
+                            stepno = loop_stack[-1][0]
+                        continue
+                    if rsrc_pathname == 'loop':
+                        start_loop(stepno, step[step_key])
                         continue
                     if os.path.exists('.terraflop-output/%s' \
                                      % rsrc_pathname):
