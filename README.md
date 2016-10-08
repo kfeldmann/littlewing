@@ -243,12 +243,13 @@ Variables and output attributes are all global. There is no local scope.
 
 Imagine that you want to update all route tables in a certain project,
 adding a new route to each one. You might not know up front how many
-route tables there are (or maybe you want to make a re-usable script
+route tables there are (or maybe you want to make a re-usable module
 that can be applied to multiple projects). You can use a `describe`
 command to produce a listing of the appropriate route tables, and
 then loop over that list to apply the new route.
 
-Loops in Littlewing are created using the following syntax:
+Loops in Littlewing are created using the following syntax within a
+step list:
 
 ```YAML
 - loop: COUNT
