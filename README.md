@@ -70,7 +70,7 @@ files. It is common to name files with a numeric prefix so that
 they sort unambiguously (see `example-apps`).
 
 ```
-10_app.yml
+10_meta.yml
 20_web-tier.yml
 30_database-tier.yml
 ```
@@ -155,6 +155,13 @@ has run in the past, prepend the key with a `+` character.
 Print statements, variable assignments, and everything outside of
 any step list will always run every time.
 
+You can run `lw` on some initial commands and view the output
+to copy the references to use in subsequent commands. When you re-run
+`lw`, the previous commands that have already run will be skipped.
+In this way, your work can be very iterative.
+
+## Variables
+
 Variables can be used throughout a Littlewing configuration. There
 are two types of variables: strings and maps.
 
@@ -167,7 +174,7 @@ var.NAME: VALUE
 Example:
 
 ```YAML
-var.region: us-west-2
+var.appname: my-app-name
 ```
 
 Map variables are defined using this syntax:
@@ -197,6 +204,8 @@ To dereference one item in a map variable, use:
 ```
 ~{var.NAME.KEY}
 ```
+
+## Resource Attributes
 
 To dereference an attribute from the output of a previous command,
 use the following syntax:
@@ -228,12 +237,46 @@ working outwards (and right-wards) until the string is variable-free.
 This nesting enables parameterized configurations that are easily cloned
 and/or reused.
 
-You can run `lw` on some initial commands and view the output
-to copy the references to use in subsequent commands. When you re-run
-`lw`, the previous commands that have already run will be skipped.
-In this way, your work can be very iterative.
+Variables and output attributes are all global. There is no local scope.
 
-Variables and output are all global. There is no local scope.
+## Loops
+
+Imagine that you want to update all route tables in a certain project,
+adding a new route to each one. You might not know up front how many
+route tables there are (or maybe you want to make a re-usable script
+that can be applied to multiple projects). You can use a `describe`
+command to produce a listing of the appropriate route tables, and
+then loop over that list to apply the new route.
+
+Loops in Littlewing are created using the following syntax:
+
+```YAML
+- loop: COUNT
+- <other steps...>
+- end-loop:
+```
+
+Inside the loop, the variable `LOOP_INDEX` will be automatically incremented
+for each cycle, starting at zero.
+
+In our example above, you could refer to each route table by using the
+`LOOP_INDEX` variable in the position of the list index of the route table
+listing. For example:
+
+```
+aws.ec2.describe-route-tables.a.RouteTables.~{var.LOOP_INDEX}.RouteTableId
+```
+
+Littlewing stores the number of items in each output list using a custom `Count`
+attribute. For example:
+
+```
+aws.ec2.describe-route-tables.a.RouteTables.Count
+```
+
+Loops can be nested.
+
+## Modules
 
 There is no special concept of modules in Littlewing, but you can easily
 reuse parameterized configurations (see example-apps). The procedure is
@@ -249,6 +292,8 @@ For example, in the modules directory you can find some sample modules that
 create app-level networking pieces, and tier-level networking pieces. Notice
 how the sample app defines variables for each in fairly small files, then
 symlinks in the larger module files to do the heavy lifting.
+
+## Miscellaneous
 
 At least once per application configuration, usually in one of the first files,
 you should set the profile and region to be used by aws cli. This is done with
