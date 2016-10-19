@@ -262,7 +262,10 @@ def varsub_tuple(intuple):
         return None
     outtuple = []
     for item in intuple:
-        outtuple.append(varsub(item))
+        try:
+            outtuple.append(varsub(item))
+        except ValueError as ex:
+            _err(str(ex))
     return outtuple
 
 def set_region(value, tries=1, trylimit=1):
