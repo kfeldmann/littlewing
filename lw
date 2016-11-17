@@ -207,7 +207,8 @@ def aws_call(region, profile, cmdtuple, argtuple):
 def exec_call(cmd, argtuple):
     "Spawn subprocess to execute <cmd>."
     args = [cmd]
-    args.extend(argtuple)
+    if argtuple:
+        args.extend(argtuple)
     try:
         outdata = subprocess.check_output(args)
     except Exception as ex:
