@@ -200,6 +200,7 @@ def aws_call(region, profile, cmdtuple, argtuple):
             JSON source:
             %s
             """ % (AWSCLI, cmdtuple[0], cmdtuple[1], ex, outdata))
+        outdict['Output'] = outdata
     else:
         outdict = None
     return outdict
@@ -329,6 +330,33 @@ def start_loop(this_stepno, value, tries=1, trylimit=1):
     set_loop_index_var()
     return True
 
+def check_null_loop():
+    """
+    Are we inside a loop that is already at it's limit? For example,
+    a zero-length loop which can be used as a poor-man's boolean.
+    """
+    if len(loop_stack) > 0:
+        if loop_stack[-1][2] >= loop_stack[-1][1]:
+            _dbg('check_null_loop() returning True')
+            return True
+    else:
+        _dbg('check_null_loop() returning False')
+        return False
+
+def add_null_loop():
+    global null_loop_depth
+    null_loop_depth += 1
+    _dbg('Added a null loop')
+    return None
+
+def end_null_loop():
+    global null_loop_depth
+    if null_loop_depth <= 0:
+        return False
+    null_loop_depth -= 1
+    _dbg('Subtracted a null loop')
+    return True
+
 def increment_loop_index():
     """
     Increment the loop_index value.
@@ -351,6 +379,13 @@ def increment_loop_index():
 def set_loop_index_var():
     if len(loop_stack) > 0:
         var['LOOP_INDEX'] = str(loop_stack[-1][2])
+        _dbg('Setting LOOP_INDEX to %s' % str(loop_stack[-1][2]))
+        if len(loop_stack) > 1:
+            j = 1
+            for i in range(len(loop_stack)-2, -1, -1):
+                var['LOOP_INDEX_%d' % j] = str(loop_stack[i][2])
+                _dbg('i=%d, Setting LOOP_INDEX_%d to %s' % (i, j, str(loop_stack[i][2])))
+                j += 1
     else:
         var['LOOP_INDEX'] = "0"
     return None
@@ -460,9 +495,19 @@ profile = None
 var = {}
 var['USER'] = os.environ.get('USER', 'littlewing')
 var['LOOP_INDEX'] = "0"
+var['LOOP_INDEX_1'] = "0"
+var['LOOP_INDEX_2'] = "0"
+var['LOOP_INDEX_3'] = "0"
+var['LOOP_INDEX_4'] = "0"
+var['LOOP_INDEX_5'] = "0"
+var['LOOP_INDEX_6'] = "0"
+var['LOOP_INDEX_7'] = "0"
+var['LOOP_INDEX_8'] = "0"
+var['LOOP_INDEX_9'] = "0"
 target_groups = {}
 marker = 'tilde'
 loop_stack = []
+null_loop_depth = 0
 
 for in_file in input_files:
     f = open(in_file, 'r')
@@ -577,6 +622,25 @@ for in_file in input_files:
                         rsrc_pathname = varsub(step_key)
                     except ValueError as ex:
                         _err(str(ex))
+                    if rsrc_pathname == 'end-loop':
+                        if len(loop_stack) == 0:
+                            _err('Found "end-loop" outside of any loop.')
+                        if end_null_loop():
+                            continue
+                        else:
+                            if increment_loop_index():
+                                stepno = loop_stack[-1][0]
+                            continue
+                    if rsrc_pathname == 'loop':
+                        if check_null_loop():
+                            add_null_loop()
+                            continue
+                        else:
+                            start_loop(stepno, step[step_key])
+                            continue
+                    if check_null_loop():
+                        _dbg('Inside a null loop. Skipping to the end.')
+                        continue # If we're inside a null loop, skip to the end-loop
                     if rsrc_pathname == 'print':
                         if isinstance(step[step_key], basestring):
                             try:
@@ -603,15 +667,6 @@ for in_file in input_files:
                         ky = rsrc_pathname[4:]
                         rawval = step[step_key]
                         set_var(ky, rawval)
-                        continue
-                    if rsrc_pathname == 'end-loop':
-                        if len(loop_stack) == 0:
-                            _err('Found "end-loop" outside of any loop.')
-                        if increment_loop_index():
-                            stepno = loop_stack[-1][0]
-                        continue
-                    if rsrc_pathname == 'loop':
-                        start_loop(stepno, step[step_key])
                         continue
                     if os.path.exists('%s/%s' \
                                      % (outdir, rsrc_pathname)):

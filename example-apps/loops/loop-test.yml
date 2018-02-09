@@ -1,4 +1,4 @@
-region: us-west-2
+region: my-region
 profile: my-profile
 
 steps:
@@ -7,7 +7,16 @@ steps:
 - print: "  Outer loop (~{var.LOOP_INDEX} of 3)"
 - loop: 2
 - print: "    Inner loop (~{var.LOOP_INDEX} of 2)"
-- end-loop:
-- end-loop:
+- print: "    (outer loop index value is ~{var.LOOP_INDEX_1})"
+- end-loop: # inner loop
+- end-loop: # outer loop
+- print: "  Null loop (should print nothing)"
+- loop: 0
+- print: "ERROR: This line should not be printed because it is inside the null loop."
+- loop: 1 # This loop should be hidden inside the null loop (so not executed)
+- print: "ERROR: Hidden loop. This line should not be printed because it is inside the null loop."
+- end-loop: # hidden loop
+- print: "ERROR: This line should not be printed because it is inside the null loop."
+- end-loop: # null loop
 - print: Ending
 

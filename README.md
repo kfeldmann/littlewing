@@ -258,7 +258,9 @@ step list:
 ```
 
 Inside the loop, the variable `LOOP_INDEX` will be automatically incremented
-for each cycle, starting at zero.
+for each cycle, starting at zero. In nested loops, the index of parent loops
+is stored as `LOOP_INDEX_1` for the parent, `LOOP_INDEX_2` for the grandparent,
+etc. (up to `LOOP_INDEX_9` for a nesting depth of 10).
 
 In our example above, you could refer to each route table by using the
 `LOOP_INDEX` variable in the position of the list index of the route table
