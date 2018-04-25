@@ -6,7 +6,7 @@
 # be able to destroy and rebuild the app server
 # without destroying the database.
 
-profile: webhosting-poc2
+profile: my-profile
 region: us-west-2
 
 default-target: build

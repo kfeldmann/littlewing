@@ -265,7 +265,8 @@ def clear_one_output(path):
         _err("Output not found: %s. Was it already cleared?" % path)
     else:
         ts = time.strftime('%Y%m%d%H%M%S', time.localtime())
-        os.mkdir('%s-cleared-%s' % (outdir, ts))
+        if not os.path.exists('%s-cleared-%s' % (outdir, ts)):
+            os.mkdir('%s-cleared-%s' % (outdir, ts))
         os.rename( \
           '%s/%s' % (outdir, path),
           '%s-cleared-%s/%s' % (outdir, ts, path))
