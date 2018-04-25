@@ -1,0 +1,24 @@
+# Run some AWS commands ('build' target), and
+# clear one of them ('destroy' target).
+#
+# This is useful if you want to, for example,
+# create an app server and a database, and then
+# be able to destroy and rebuild the app server
+# without destroying the database.
+
+profile: webhosting-poc2
+region: us-west-2
+
+default-target: build
+
+var.drt: describe-route-tables
+
+steps.build:
+- aws.ec2.describe-regions.a: null
+- aws.ec2.~{var.drt}.a: null
+- aws.ec2.describe-network-acls.a: null
+
+steps.destroy:
+- print: Destroying aws.ec2.~{var.drt}.a
+- clear-one-output: aws.ec2.~{var.drt}.a
+

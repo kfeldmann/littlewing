@@ -258,6 +258,19 @@ def clear_all_output():
     os.mkdir('.lw-output') # Use new naming regardless of previous
     return None
 
+def clear_one_output(path):
+    "Move one output file aside, effectively clearing it."
+    if not os.path.exists('%s/%s' \
+                      % (outdir, path)):
+        _err("Output not found: %s. Was it already cleared?" % path)
+    else:
+        ts = time.strftime('%Y%m%d%H%M%S', time.localtime())
+        os.mkdir('%s-cleared-%s' % (outdir, ts))
+        os.rename( \
+          '%s/%s' % (outdir, path),
+          '%s-cleared-%s/%s' % (outdir, ts, path))
+    return None
+
 def varsub_tuple(intuple):
     "Substitute variables in each element of a tuple."
     if intuple == None:
@@ -656,6 +669,11 @@ for in_file in input_files:
                         if step[step_key]:
                             _inf('Running %s' % rsrc_pathname)
                             clear_all_output()
+                        continue
+                    if rsrc_pathname == 'clear-one-output':
+                        if step[step_key]:
+                            _inf('Running %s' % rsrc_pathname)
+                            clear_one_output(varsub(step[step_key]))
                         continue
                     if rsrc_pathname == 'region':
                         set_region(step[step_key])
