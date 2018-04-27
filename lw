@@ -255,8 +255,12 @@ def store_output(name, outdict):
 def clear_all_output():
     "Move all output aside, effectively clearing it."
     global ts
-    os.rename(outdir, '%s-cleared-%s' % (outdir, ts))
-    os.mkdir('.lw-output') # Use new naming regardless of previous
+    if not os.path.exists('%s-cleared-%s' % (outdir, ts)):
+        os.mkdir('%s-cleared-%s' % (outdir, ts))
+    for f in os.listdir(outdir):
+        os.rename( \
+          '%s/%s' % (outdir, f),
+          '%s-cleared-%s/%s' % (outdir, ts, f))
     return None
 
 def clear_one_output(path):
