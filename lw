@@ -49,6 +49,7 @@ AWSCLI = os.environ.get('AWSCLI', 'aws')
 filename = '(none)'
 lineno = '(none)'
 stepno = '(none)'
+ts = time.strftime('%Y%m%d%H%M%S', time.localtime())
 
 def _err(message):
     """
@@ -253,18 +254,18 @@ def store_output(name, outdict):
 
 def clear_all_output():
     "Move all output aside, effectively clearing it."
-    ts = time.strftime('%Y%m%d%H%M%S', time.localtime())
+    global ts
     os.rename(outdir, '%s-cleared-%s' % (outdir, ts))
     os.mkdir('.lw-output') # Use new naming regardless of previous
     return None
 
 def clear_one_output(path):
     "Move one output file aside, effectively clearing it."
+    global ts
     if not os.path.exists('%s/%s' \
                       % (outdir, path)):
         _err("Output not found: %s. Was it already cleared?" % path)
     else:
-        ts = time.strftime('%Y%m%d%H%M%S', time.localtime())
         if not os.path.exists('%s-cleared-%s' % (outdir, ts)):
             os.mkdir('%s-cleared-%s' % (outdir, ts))
         os.rename( \
