@@ -104,8 +104,11 @@ def __varsub(in_str):
                 raise ValueError('Unknown variable: %s' % words[1])
         elif len(words) == 3:
             if words[1] in var:
-                if words[2] in var[words[1]]:
+                if isinstance(var[words[1]], dict) and words[2] in var[words[1]]:
                     return var[words[1]][words[2]]
+                elif isinstance(var[words[1]], basestring):
+                    raise ValueError('Treating a string variable as a map: %s.%s'
+                                    % (words[1], words[2]))
                 else:
                     raise ValueError('Unknown variable: %s.%s'
                                     % (words[1], words[2]))
@@ -423,9 +426,11 @@ def set_var(name, value, tries=1, trylimit=1):
     elif isinstance(value, int):
         var[name] = str(value)
         _dbg('Set int var[%s] = "%s"' % (name, var[name]))
-    else:
+    elif isinstance(value, dict):
         var[name] = value
-        _dbg('Set other var[%s] = "%s"' % (name, var[name]))
+        _dbg('Set dict var[%s] = "%s"' % (name, repr(var[name])))
+    else:
+        _err('Unknown variable type for var.%s' % name)
     return True
 
 def set_default_target(value, tries=1, trylimit=1):
