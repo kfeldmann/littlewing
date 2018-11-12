@@ -195,6 +195,9 @@ def aws_call(region, profile, cmdtuple, argtuple):
              % (AWSCLI, cmdtuple[0], cmdtuple[1], ex) \
              + 'ERROR: Args: %s' % repr(args))
     if outdata: # Some calls do not return data
+        if cmdtuple[0] == 's3':
+            # Output is text, not JSON
+            return {'Output': outdata}
         try:
             outdict = json.loads(outdata)
         except Exception as ex:
