@@ -10,7 +10,7 @@ steps:
 - print: "    (outer loop index value is ~{var.LOOP_INDEX_1})"
 - end-loop: # inner loop
 - end-loop: # outer loop
-- print: "  Null loop (should print nothing)"
+- print: "  Null loop (should print nothing indented after this line)"
 - loop: 0
 - print: "ERROR: This line should not be printed because it is inside the null loop."
 - loop: 1 # This loop should be hidden inside the null loop (so not executed)
