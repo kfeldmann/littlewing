@@ -1,4 +1,4 @@
-#!/usr/bin/python2.7 -O
+#!/usr/bin/env python
 
 """
 Littlewing: Simple, powerful infrastructure automation.
@@ -37,37 +37,55 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 import sys
-import yaml
 import json
 import os
 import re
 import subprocess
-from urllib import quote, unquote
 import time
 
+import yaml
+
+if sys.version_info > (3, 0):
+    from urllib.parse import quote, unquote
+else:
+    from urllib import quote, unquote
+
 AWSCLI = os.environ.get('AWSCLI', 'aws')
-filename = '(none)'
-lineno = '(none)'
-stepno = '(none)'
-ts = time.strftime('%Y%m%d%H%M%S', time.localtime())
+FILENAME = '(none)'
+LINENO = '(none)'
+STEPNO = '(none)'
+TS = time.strftime('%Y%m%d%H%M%S', time.localtime())
+
+REGION = None
+PROFILE = None
+VAR = {}
+TARGET_GROUPS = {}
+MARKER = 'tilde'
+LOOP_STACK = []
+NULL_LOOP_DEPTH = 0
+
+LISTING = False
+TARGET = None
+DEFAULT_FOUND = False
+OUTDIR = '.lw-output'
 
 def _err(message):
     """
-    Write error message to stderr along with filename,
-    stepno, and lineno, and then exit(1).
+    Write error message to stderr along with FILENAME,
+    STEPNO, and LINENO, and then exit(1).
     """
     sys.stderr.write('ERROR: file: %s, step: %s, line: %s\n' \
-                    % (filename, stepno, lineno))
+                    % (FILENAME, STEPNO, LINENO))
     sys.stderr.write('ERROR: %s\n' % message)
     raise SystemExit(1)
 
 def _wrn(message):
     """
-    Write warning message to stderr along with filename,
-    stepno, and lineno.
+    Write warning message to stderr along with FILENAME,
+    STEPNO, and LINENO.
     """
     sys.stderr.write('WARN: file: %s, step: %s, line: %s\n' \
-                    % (filename, stepno, lineno))
+                    % (FILENAME, STEPNO, LINENO))
     sys.stderr.write('WARN: %s\n' % message)
     return None
 
@@ -92,29 +110,26 @@ def usage():
 
 def __varsub(in_str):
     "Dereference variables and output references."
-    global filename, lineno
+    global FILENAME, LINENO
     _dbg('__varsub(): starting with in_str = %s' % in_str)
     words = in_str.split('.')
     _dbg('__varsub(): words = %s' % repr(words))
     if words[0] == 'var':
         if len(words) == 2:
-            if words[1] in var:
-                return var[words[1]]
-            else:
-                raise ValueError('Unknown variable: %s' % words[1])
+            if words[1] in VAR:
+                return VAR[words[1]]
+            raise ValueError('Unknown variable: %s' % words[1])
         elif len(words) == 3:
-            if words[1] in var:
-                if isinstance(var[words[1]], dict) and words[2] in var[words[1]]:
-                    return var[words[1]][words[2]]
-                elif isinstance(var[words[1]], basestring):
+            if words[1] in VAR:
+                if isinstance(VAR[words[1]], dict) and words[2] in VAR[words[1]]:
+                    return VAR[words[1]][words[2]]
+                if isinstance(VAR[words[1]], str):
                     raise ValueError('Treating a string variable as a map: %s.%s'
-                                    % (words[1], words[2]))
-                else:
-                    raise ValueError('Unknown variable: %s.%s'
-                                    % (words[1], words[2]))
-            else:
+                                     % (words[1], words[2]))
                 raise ValueError('Unknown variable: %s.%s'
-                                % (words[1], words[2]))
+                                 % (words[1], words[2]))
+            raise ValueError('Unknown variable: %s.%s'
+                             % (words[1], words[2]))
     if words[0] == 'aws':
         fname = '.'.join(words[:4])
     elif words[0] == 'exec':
@@ -122,14 +137,14 @@ def __varsub(in_str):
     else:
         _err('Unknown provider: %s' % words[0])
     try:
-        f = open('%s/%s' % (outdir, fname), 'r')
-        filename = '%s/%s' % (outdir, fname)
+        f = open('%s/%s' % (OUTDIR, fname), 'r')
+        FILENAME = '%s/%s' % (OUTDIR, fname)
     except IOError:
         _err('Unknown resource: %s' % fname)
-    lineno = 0
+    LINENO = 0
     while True:
         line = f.readline()
-        lineno += 1
+        LINENO += 1
         if line == '':
             break
         line = line.strip()
@@ -138,7 +153,7 @@ def __varsub(in_str):
         except ValueError:
             f.close()
             _err('Malformed line in output file (%s): %s'
-                % (fname, line))
+                 % (fname, line))
         if n == in_str:
             f.close()
             return unquote(v)
@@ -157,7 +172,7 @@ def varsub(val):
         return str(val)
     i = 0
     while i < 10:
-        if marker == 'dollar':
+        if MARKER == 'dollar':
             s = re.search(r'\$\{([^${}]+)\}', val)
         else:
             s = re.search(r'\~\{([^~{}]+)\}', val)
@@ -170,7 +185,7 @@ def varsub(val):
         needle = s.group(0).replace('$', r'\$')
         val = re.sub(needle, __varsub(s.group(1)), val)
         i += 1
-    if marker == 'dollar':
+    if MARKER == 'dollar':
         # Un-escape $\\{ --> ${, and $\\\{ --> $\{
         val = val.replace(r'$\\{', r'${')
         val = val.replace(r'$\\\{', r'$\{')
@@ -181,10 +196,10 @@ def aws_call(region, profile, cmdtuple, argtuple):
     if (not region) or (not profile):
         _err('Must set region and profile before calling aws.')
     args = [
-            AWSCLI,
-            '--region', region,
-            '--profile', profile
-           ]
+        AWSCLI,
+        '--region', region,
+        '--profile', profile
+    ]
     args.extend(cmdtuple)
     if argtuple:
         args.extend(argtuple)
@@ -230,10 +245,10 @@ def stringify(path, name, obj):
     attribute and its value.
     """
     strings = []
-    if obj == None:
+    if obj is None:
         return strings
     if isinstance(obj, dict):
-        for k in obj.keys():
+        for k in obj:
             strings.extend(stringify('%s.%s' % (path, name), k, obj[k]))
     elif isinstance(obj, list):
         i = 0
@@ -250,7 +265,7 @@ def stringify(path, name, obj):
 def store_output(name, outdict):
     "Stringify and write out the output data from a step."
     try:
-        f = open('%s/%s' % (outdir, name), 'w')
+        f = open('%s/%s' % (OUTDIR, name), 'w')
     except IOError:
         _err('Failed to open output file: %s' % name)
     for line in stringify('', name, outdict):
@@ -260,32 +275,32 @@ def store_output(name, outdict):
 
 def clear_all_output():
     "Move all output aside, effectively clearing it."
-    global ts
-    if not os.path.exists('%s-cleared-%s' % (outdir, ts)):
-        os.mkdir('%s-cleared-%s' % (outdir, ts))
-    for f in os.listdir(outdir):
+    global TS
+    if not os.path.exists('%s-cleared-%s' % (OUTDIR, TS)):
+        os.mkdir('%s-cleared-%s' % (OUTDIR, TS))
+    for f in os.listdir(OUTDIR):
         os.rename( \
-          '%s/%s' % (outdir, f),
-          '%s-cleared-%s/%s' % (outdir, ts, f))
+          '%s/%s' % (OUTDIR, f),
+          '%s-cleared-%s/%s' % (OUTDIR, TS, f))
     return None
 
 def clear_one_output(path):
     "Move one output file aside, effectively clearing it."
-    global ts
+    global TS
     if not os.path.exists('%s/%s' \
-                      % (outdir, path)):
+                      % (OUTDIR, path)):
         _err("Output not found: %s. Was it already cleared?" % path)
     else:
-        if not os.path.exists('%s-cleared-%s' % (outdir, ts)):
-            os.mkdir('%s-cleared-%s' % (outdir, ts))
+        if not os.path.exists('%s-cleared-%s' % (OUTDIR, TS)):
+            os.mkdir('%s-cleared-%s' % (OUTDIR, TS))
         os.rename( \
-          '%s/%s' % (outdir, path),
-          '%s-cleared-%s/%s' % (outdir, ts, path))
+          '%s/%s' % (OUTDIR, path),
+          '%s-cleared-%s/%s' % (OUTDIR, TS, path))
     return None
 
 def varsub_tuple(intuple):
     "Substitute variables in each element of a tuple."
-    if intuple == None:
+    if intuple is None:
         return None
     outtuple = []
     for item in intuple:
@@ -297,13 +312,13 @@ def varsub_tuple(intuple):
 
 def set_region(value, tries=1, trylimit=1):
     """
-    Set the global 'region` and var['REGION'] variables
+    Set the global 'REGION` and VAR['REGION'] variables
     using variable substitution.
     """
-    global region
+    global REGION
     try:
-        region = varsub(value)
-        var['REGION'] = region
+        REGION = varsub(value)
+        VAR['REGION'] = REGION
     except ValueError as ex:
         if tries >= trylimit:
             _err(str(ex))
@@ -313,13 +328,13 @@ def set_region(value, tries=1, trylimit=1):
 
 def set_profile(value, tries=1, trylimit=1):
     """
-    Set the global 'profile` and var['PROFILE'] variables
+    Set the global 'PROFILE` and VAR['PROFILE'] variables
     using variable substitution.
     """
-    global profile
+    global PROFILE
     try:
-        profile = varsub(value)
-        var['PROFILE'] = profile
+        PROFILE = varsub(value)
+        VAR['PROFILE'] = PROFILE
     except ValueError as ex:
         if tries >= trylimit:
             _err(str(ex))
@@ -329,9 +344,9 @@ def set_profile(value, tries=1, trylimit=1):
 
 def start_loop(this_stepno, value, tries=1, trylimit=1):
     """
-    Push the start and count of this loop onto the loop_stack.
+    Push the start and count of this loop onto the LOOP_STACK.
     Use variable substitution for the length.
-    The values in loop_stack[] have the following format:
+    The values in LOOP_STACK[] have the following format:
     [starting_stepno, loop_count, loop_index]
     The loop_index value is incremented during the loop
     execution until it is equal to loop_count.
@@ -351,7 +366,7 @@ def start_loop(this_stepno, value, tries=1, trylimit=1):
         else:
             _dbg('Pushing loop onto the stack: [%d, %d, 0]' \
                 % (this_stepno, count))
-            loop_stack.append([this_stepno, count, 0])
+            LOOP_STACK.append([this_stepno, count, 0])
     set_loop_index_var()
     return True
 
@@ -360,25 +375,32 @@ def check_null_loop():
     Are we inside a loop that is already at it's limit? For example,
     a zero-length loop which can be used as a poor-man's boolean.
     """
-    if len(loop_stack) > 0:
-        if loop_stack[-1][2] >= loop_stack[-1][1]:
+    if LOOP_STACK:
+        if LOOP_STACK[-1][2] >= LOOP_STACK[-1][1]:
             _dbg('check_null_loop() returning True')
             return True
     else:
         _dbg('check_null_loop() returning False')
         return False
+    return None # only for pylint
 
 def add_null_loop():
-    global null_loop_depth
-    null_loop_depth += 1
+    """
+    Add a "null loop" to the stack (actually just a counter).
+    """
+    global NULL_LOOP_DEPTH
+    NULL_LOOP_DEPTH += 1
     _dbg('Added a null loop')
     return None
 
 def end_null_loop():
-    global null_loop_depth
-    if null_loop_depth <= 0:
+    """
+    Remove a "null loop" from the stack (actually just a counter).
+    """
+    global NULL_LOOP_DEPTH
+    if NULL_LOOP_DEPTH <= 0:
         return False
-    null_loop_depth -= 1
+    NULL_LOOP_DEPTH -= 1
     _dbg('Subtracted a null loop')
     return True
 
@@ -388,67 +410,71 @@ def increment_loop_index():
     Return True if the loop should continue, and False if it has reached
     the end (index == count).
     """
-    loop_stack[-1][2] += 1
+    LOOP_STACK[-1][2] += 1
     _dbg('Loop status: %d, %d, %d' \
-        % (loop_stack[-1][0], loop_stack[-1][1], loop_stack[-1][2]))
-    if loop_stack[-1][2] >= loop_stack[-1][1]:
-        _dbg('Loop done. Popping from loop_stack.')
-        loop_stack.pop()
+        % (LOOP_STACK[-1][0], LOOP_STACK[-1][1], LOOP_STACK[-1][2]))
+    if LOOP_STACK[-1][2] >= LOOP_STACK[-1][1]:
+        _dbg('Loop done. Popping from LOOP_STACK.')
+        LOOP_STACK.pop()
         set_loop_index_var()
         return False
-    else:
-        _dbg('Loop continuing.')
-        set_loop_index_var()
-        return True
+    _dbg('Loop continuing.')
+    set_loop_index_var()
+    return True
 
 def set_loop_index_var():
-    if len(loop_stack) > 0:
-        var['LOOP_INDEX'] = str(loop_stack[-1][2])
-        _dbg('Setting LOOP_INDEX to %s' % str(loop_stack[-1][2]))
-        if len(loop_stack) > 1:
+    """
+    Update the LOOP_INDEX* variables, which indicate how many times
+    each loop has iterated so far.
+    """
+    if LOOP_STACK:
+        VAR['LOOP_INDEX'] = str(LOOP_STACK[-1][2])
+        _dbg('Setting LOOP_INDEX to %s' % str(LOOP_STACK[-1][2]))
+        if len(LOOP_STACK) > 1:
             j = 1
-            for i in range(len(loop_stack)-2, -1, -1):
-                var['LOOP_INDEX_%d' % j] = str(loop_stack[i][2])
-                _dbg('i=%d, Setting LOOP_INDEX_%d to %s' % (i, j, str(loop_stack[i][2])))
+            for i in range(len(LOOP_STACK)-2, -1, -1):
+                VAR['LOOP_INDEX_%d' % j] = str(LOOP_STACK[i][2])
+                _dbg('i=%d, Setting LOOP_INDEX_%d to %s' \
+                     % (i, j, str(LOOP_STACK[i][2])))
                 j += 1
     else:
-        var['LOOP_INDEX'] = "0"
+        VAR['LOOP_INDEX'] = "0"
     return None
 
 def set_var(name, value, tries=1, trylimit=1):
-    "Set global 'var[name]' using variable substitution."
-    if isinstance(value, basestring):
+    "Set global 'VAR[name]' using variable substitution."
+    if isinstance(value, str):
         try:
-            var[name] = varsub(value)
-            _dbg('Set string var[%s] = "%s"' % (name, var[name]))
+            VAR[name] = varsub(value)
+            _dbg('Set string VAR[%s] = "%s"' % (name, VAR[name]))
         except ValueError as ex:
             if tries >= trylimit:
                 _err(str(ex))
             else:
                 return False
     elif isinstance(value, int):
-        var[name] = str(value)
-        _dbg('Set int var[%s] = "%s"' % (name, var[name]))
+        VAR[name] = str(value)
+        _dbg('Set int VAR[%s] = "%s"' % (name, VAR[name]))
     elif isinstance(value, dict):
-        var[name] = value
-        _dbg('Set dict var[%s] = "%s"' % (name, repr(var[name])))
+        VAR[name] = value
+        _dbg('Set dict VAR[%s] = "%s"' % (name, repr(VAR[name])))
     else:
         _err('Unknown variable type for var.%s' % name)
     return True
 
 def set_default_target(value, tries=1, trylimit=1):
     """
-    Set global 'target' (once) using variable substitution.
+    Set global 'TARGET' (once) using variable substitution.
     """
-    global target
-    global default_found
+    global TARGET
+    global DEFAULT_FOUND
 
-    if not target:
-        if isinstance(value, basestring):
+    if not TARGET:
+        if isinstance(value, str):
             try:
-                target = varsub(value)
-                if listing:
-                    default_found = True
+                TARGET = varsub(value)
+                if LISTING:
+                    DEFAULT_FOUND = True
             except ValueError as ex:
                 if tries >= trylimit:
                     _err(str(ex))
@@ -457,13 +483,14 @@ def set_default_target(value, tries=1, trylimit=1):
         else:
             _wrn('Default target must be a string.')
         return True
+    return None # only for pylint
 
 def set_target_groups(tgdict, tries=1, trylimit=1):
-    "Set global 'target_groups' using variable substitution."
+    "Set global 'TARGET_GROUPS' using variable substitution."
     if not isinstance(tgdict, dict):
         _wrn("'target-groups' must be a dict.")
         return True
-    for tgname in tgdict.keys():
+    for tgname in tgdict:
         if not isinstance(tgdict[tgname], list):
             _wrn("'target-groups: %s' must be a list." % tgname)
             return True
@@ -476,7 +503,7 @@ def set_target_groups(tgdict, tries=1, trylimit=1):
                 return False
         else:
             try:
-                target_groups[tgn] = varsub_tuple(tgdict[tgname])
+                TARGET_GROUPS[tgn] = varsub_tuple(tgdict[tgname])
             except ValueError as ex:
                 if tries >= trylimit:
                     _err(str(ex))
@@ -492,74 +519,62 @@ if len(sys.argv) > 2 \
         or '--help' in sys.argv:
     usage()
 
-listing = False
-target = None
-default_found = False
-outdir = '.lw-output'
-
 if len(sys.argv) == 2:
     if sys.argv[1] in ('-l', '--list'):
-        listing = True
+        LISTING = True
     else:
-        target = sys.argv[1]
+        TARGET = sys.argv[1]
 
 # Legacy support
 if os.path.exists('.terraflop-output'):
-    outdir = '.terraflop-output'
+    OUTDIR = '.terraflop-output'
 
-if not os.path.exists(outdir):
-    os.mkdir(outdir)
+if not os.path.exists(OUTDIR):
+    os.mkdir(OUTDIR)
 
-all_files = os.listdir('.')
-input_files = []
-for f in all_files:
+ALL_FILES = os.listdir('.')
+INPUT_FILES = []
+for f in ALL_FILES:
     if f[-4:] == '.yml':
-        input_files.append(f)
-input_files.sort()
+        INPUT_FILES.append(f)
+INPUT_FILES.sort()
 
-region = None
-profile = None
-var = {}
-var['USER'] = os.environ.get('USER', 'littlewing')
-var['LOOP_INDEX'] = "0"
-var['LOOP_INDEX_1'] = "0"
-var['LOOP_INDEX_2'] = "0"
-var['LOOP_INDEX_3'] = "0"
-var['LOOP_INDEX_4'] = "0"
-var['LOOP_INDEX_5'] = "0"
-var['LOOP_INDEX_6'] = "0"
-var['LOOP_INDEX_7'] = "0"
-var['LOOP_INDEX_8'] = "0"
-var['LOOP_INDEX_9'] = "0"
-target_groups = {}
-marker = 'tilde'
-loop_stack = []
-null_loop_depth = 0
+VAR['USER'] = os.environ.get('USER', 'littlewing')
+VAR['LOOP_INDEX'] = "0"
+VAR['LOOP_INDEX_1'] = "0"
+VAR['LOOP_INDEX_2'] = "0"
+VAR['LOOP_INDEX_3'] = "0"
+VAR['LOOP_INDEX_4'] = "0"
+VAR['LOOP_INDEX_5'] = "0"
+VAR['LOOP_INDEX_6'] = "0"
+VAR['LOOP_INDEX_7'] = "0"
+VAR['LOOP_INDEX_8'] = "0"
+VAR['LOOP_INDEX_9'] = "0"
 
-for in_file in input_files:
+for in_file in INPUT_FILES:
     f = open(in_file, 'r')
-    filename = in_file
-    lineno = '(yaml)'
+    FILENAME = in_file
+    LINENO = '(yaml)'
     yd = yaml.load(f)
     f.close()
 
-    # Attempt to auto-discover the variable marker ('$' or '~')
+    # Attempt to auto-discover the variable MARKER ('$' or '~')
     f = open(in_file, 'r')
     data = f.read()
     f.close()
     dollar = data.count('${')
     tilde = data.count('~{')
     if dollar > 0 and tilde == 0:
-        marker = 'dollar'
-        _dbg('Setting variable marker to dollar ${}')
+        MARKER = 'dollar'
+        _dbg('Setting variable MARKER to dollar ${}')
     elif dollar > 0 and tilde > 0:
         _wrn('Found both ${dollar} and ~{tilde} variable markers!')
 
     # Have to make sure we load all the vars, target-groups,
     # default-target, and set region/profile before
     # running the steps.
-    if listing:
-        _inf('File: %s' % filename)
+    if LISTING:
+        _inf('File: %s' % FILENAME)
 
     # Try up to 'maxtries' passes to resolve variable dependencies
     z = 0
@@ -567,44 +582,44 @@ for in_file in input_files:
     vardep_keep_going = False
     while True:
         z += 1
-        for k in yd.keys():
-            lineno = '(%s...)' % str(k)[:10]
+        for k in yd:
+            LINENO = '(%s...)' % str(k)[:10]
             if k == 'region':
                 if not set_region(yd[k], z, maxtries):
                     vardep_keep_going = True
                 else:
-                    _dbg('region is set to %s' % region)
+                    _dbg('region is set to %s' % REGION)
             elif k == 'profile':
                 if not set_profile(yd[k], z, maxtries):
                     vardep_keep_going = True
                 else:
-                    _dbg('profile is set to %s' % profile)
+                    _dbg('profile is set to %s' % PROFILE)
             elif k[:4] == 'var.':
                 if not set_var(k[4:], yd[k], z, maxtries):
                     vardep_keep_going = True
                 else:
-                    _dbg('var[%s] is set to %s' % (k[4:], var[k[4:]]))
+                    _dbg('VAR[%s] is set to %s' % (k[4:], VAR[k[4:]]))
             elif k == 'default-target':
                 if not set_default_target(yd[k], z, maxtries):
                     vardep_keep_going = True
                 else:
-                    _dbg('default-target is set to %s' % target)
+                    _dbg('default-target is set to %s' % TARGET)
             elif k == 'target-groups':
                 if not set_target_groups(yd[k], z, maxtries):
                     vardep_keep_going = True
-        if (z >= maxtries) or (vardep_keep_going == False):
+        if (z >= maxtries) or (not vardep_keep_going):
             break
 
     # List targets
-    if listing:
-        if default_found:
-            _inf('Default target: %s' % target)
+    if LISTING:
+        if DEFAULT_FOUND:
+            _inf('Default target: %s' % TARGET)
         else:
             _inf('Default target: (all steps)')
-        for tgname in target_groups.keys():
+        for tgname in TARGET_GROUPS:
             _inf('[%s]: %s' \
-                % (tgname, ', '.join(target_groups[tgname])))
-        for k in yd.keys():
+                % (tgname, ', '.join(TARGET_GROUPS[tgname])))
+        for k in yd:
             if k[:5] == 'steps':
                 try:
                     tgt = varsub(k[6:])
@@ -613,7 +628,7 @@ for in_file in input_files:
                 if tgt:
                     _inf(tgt)
                 else:
-                    if default_found:
+                    if DEFAULT_FOUND:
                         _inf('(targetless - not reachable since ' \
                             + 'default target has been set)')
                     else:
@@ -621,14 +636,14 @@ for in_file in input_files:
         continue
 
     # Make the targets in a target-group run in order
-    if target and target in target_groups.keys():
-        goals = target_groups[target]
-    elif target:
-        goals = [target]
+    if TARGET and TARGET in TARGET_GROUPS:
+        goals = TARGET_GROUPS[TARGET]
+    elif TARGET:
+        goals = [TARGET]
     else:
         goals = [None]
     for goal in goals:
-        for k in yd.keys():
+        for k in yd:
             if k[:5] == 'steps':
                 try:
                     tgt = varsub(k[6:])
@@ -636,42 +651,47 @@ for in_file in input_files:
                     _err(str(ex))
                 if goal and tgt != goal:
                     _dbg('Skipping %s (target: %s, goal: %s)' \
-                         % (tgt, target, goal))
+                         % (tgt, TARGET, goal))
                     continue
                 _dbg('Examining step list %s' % k)
-                stepno = 0
-                while stepno < len(yd[k]):
-                    stepno += 1
-                    step = yd[k][stepno - 1] # stepno is 1-based for printing
-                    step_key = step.keys()[0]
-                    lineno = '(%s)' % step_key
+                STEPNO = 0
+                while STEPNO < len(yd[k]):
+                    STEPNO += 1
+                    step = yd[k][STEPNO - 1] # STEPNO is 1-based for printing
+                    # We're grabbing the first key in the dictionary.
+                    # This works only because there is always only one key.
+                    step_key = '(none)'
+                    for step_key in step:
+                        break
+                    LINENO = '(%s)' % step_key
                     try:
                         rsrc_pathname = varsub(step_key)
                     except ValueError as ex:
                         _err(str(ex))
                     if rsrc_pathname == 'end-loop':
-                        if len(loop_stack) == 0:
+                        if not LOOP_STACK:
                             _err('Found "end-loop" outside of any loop.')
                         if end_null_loop():
                             continue
                         else:
                             if increment_loop_index():
-                                stepno = loop_stack[-1][0]
+                                STEPNO = LOOP_STACK[-1][0]
                             continue
                     if rsrc_pathname == 'loop':
                         if check_null_loop():
                             add_null_loop()
                             continue
                         else:
-                            start_loop(stepno, step[step_key])
+                            start_loop(STEPNO, step[step_key])
                             continue
                     if check_null_loop():
                         _dbg('Inside a null loop. Skipping to the end.')
                         continue # If we're inside a null loop, skip to the end-loop
                     if rsrc_pathname == 'print':
-                        if isinstance(step[step_key], basestring):
+                        if isinstance(step[step_key], str):
                             try:
-                                print varsub(step[step_key])
+                                sys.stdout.write('%s\n' % \
+                                 varsub(step[step_key]))
                             except ValueError as ex:
                                 _err(str(ex))
                         else:
@@ -701,7 +721,7 @@ for in_file in input_files:
                         set_var(ky, rawval)
                         continue
                     if os.path.exists('%s/%s' \
-                                     % (outdir, rsrc_pathname)):
+                                     % (OUTDIR, rsrc_pathname)):
                         _dbg('%s has already been run.' % rsrc_pathname)
                         continue
                     if rsrc_pathname[0] == '+':
@@ -712,7 +732,7 @@ for in_file in input_files:
                         argtupleraw = step[step_key]
                         _inf('Running %s' % rsrc_pathname)
                         outdict = aws_call(
-                            region, profile, cmdtuple,
+                            REGION, PROFILE, cmdtuple,
                             varsub_tuple(argtupleraw))
                         store_output(rsrc_pathname, outdict)
                     elif words[0] == 'exec':
@@ -730,4 +750,3 @@ for in_file in input_files:
                         response = subprocess.call(args)
                     else:
                         _err('Unrecognized provider: %s' % words[0])
-
