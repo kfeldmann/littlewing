@@ -47,12 +47,11 @@ in addition to creating resources.
 
 ## Installation
 
-- Install and configure aws-cli per Amazon's instructions
-- Install python 2.7
-- Install pyyaml
+- [Install and configure aws-cli per Amazon's instructions](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html)
+- [Install pyyaml](https://pyyaml.org/wiki/PyYAMLDocumentation)
 - Clone or download Littlewing
 - Put the `lw` command in your path
-   - Copy, or symlink it into a directory that is already
+   - Copy or symlink it into a directory that is already
      in your path, or...
    - Extend your path to cover the directory where `lw` resides
 
