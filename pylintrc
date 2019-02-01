@@ -61,10 +61,12 @@ confidence=
 # no Warning level messages displayed, use "--disable=all --enable=classes
 # --disable=W".
 
-disable=useless-return,
-        global-statement,
-        redefined-outer-name,
-        broad-except
+disable=useless-return, # This contradicts PEP8!
+        no-name-in-module, # We'll find out instantly if this is true
+        global-statement, # Using global statement on purpose
+        broad-except, # Using broad except on purpose (forwarding errors from aws-cli)
+
+#        redefined-outer-name,
 
 #disable=print-statement,
 #        parameter-unpacking,
@@ -417,7 +419,6 @@ good-names=i,
            j,
            k,
            ex,
-           _,
            f,
            n,
            v,

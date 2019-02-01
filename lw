@@ -534,9 +534,9 @@ if not os.path.exists(OUTDIR):
 
 ALL_FILES = os.listdir('.')
 INPUT_FILES = []
-for f in ALL_FILES:
-    if f[-4:] == '.yml':
-        INPUT_FILES.append(f)
+for F in ALL_FILES:
+    if F[-4:] == '.yml':
+        INPUT_FILES.append(F)
 INPUT_FILES.sort()
 
 VAR['USER'] = os.environ.get('USER', 'littlewing')
@@ -552,16 +552,16 @@ VAR['LOOP_INDEX_8'] = "0"
 VAR['LOOP_INDEX_9'] = "0"
 
 for in_file in INPUT_FILES:
-    f = open(in_file, 'r')
+    F = open(in_file, 'r')
     FILENAME = in_file
     LINENO = '(yaml)'
-    yd = yaml.load(f)
-    f.close()
+    yd = yaml.load(F)
+    F.close()
 
     # Attempt to auto-discover the variable MARKER ('$' or '~')
-    f = open(in_file, 'r')
-    data = f.read()
-    f.close()
+    F = open(in_file, 'r')
+    data = F.read()
+    F.close()
     dollar = data.count('${')
     tilde = data.count('~{')
     if dollar > 0 and tilde == 0:
@@ -582,30 +582,30 @@ for in_file in INPUT_FILES:
     vardep_keep_going = False
     while True:
         z += 1
-        for k in yd:
-            LINENO = '(%s...)' % str(k)[:10]
-            if k == 'region':
-                if not set_region(yd[k], z, maxtries):
+        for K in yd:
+            LINENO = '(%s...)' % str(K)[:10]
+            if K == 'region':
+                if not set_region(yd[K], z, maxtries):
                     vardep_keep_going = True
                 else:
                     _dbg('region is set to %s' % REGION)
-            elif k == 'profile':
-                if not set_profile(yd[k], z, maxtries):
+            elif K == 'profile':
+                if not set_profile(yd[K], z, maxtries):
                     vardep_keep_going = True
                 else:
                     _dbg('profile is set to %s' % PROFILE)
-            elif k[:4] == 'var.':
-                if not set_var(k[4:], yd[k], z, maxtries):
+            elif K[:4] == 'var.':
+                if not set_var(K[4:], yd[K], z, maxtries):
                     vardep_keep_going = True
                 else:
-                    _dbg('VAR[%s] is set to %s' % (k[4:], VAR[k[4:]]))
-            elif k == 'default-target':
-                if not set_default_target(yd[k], z, maxtries):
+                    _dbg('VAR[%s] is set to %s' % (K[4:], VAR[K[4:]]))
+            elif K == 'default-target':
+                if not set_default_target(yd[K], z, maxtries):
                     vardep_keep_going = True
                 else:
                     _dbg('default-target is set to %s' % TARGET)
-            elif k == 'target-groups':
-                if not set_target_groups(yd[k], z, maxtries):
+            elif K == 'target-groups':
+                if not set_target_groups(yd[K], z, maxtries):
                     vardep_keep_going = True
         if (z >= maxtries) or (not vardep_keep_going):
             break
@@ -616,13 +616,13 @@ for in_file in INPUT_FILES:
             _inf('Default target: %s' % TARGET)
         else:
             _inf('Default target: (all steps)')
-        for tgname in TARGET_GROUPS:
+        for TGNAME in TARGET_GROUPS:
             _inf('[%s]: %s' \
-                % (tgname, ', '.join(TARGET_GROUPS[tgname])))
-        for k in yd:
-            if k[:5] == 'steps':
+                % (TGNAME, ', '.join(TARGET_GROUPS[TGNAME])))
+        for K in yd:
+            if K[:5] == 'steps':
                 try:
-                    tgt = varsub(k[6:])
+                    tgt = varsub(K[6:])
                 except ValueError as ex:
                     _err(str(ex))
                 if tgt:
@@ -643,21 +643,21 @@ for in_file in INPUT_FILES:
     else:
         goals = [None]
     for goal in goals:
-        for k in yd:
-            if k[:5] == 'steps':
+        for K in yd:
+            if K[:5] == 'steps':
                 try:
-                    tgt = varsub(k[6:])
+                    tgt = varsub(K[6:])
                 except ValueError as ex:
                     _err(str(ex))
                 if goal and tgt != goal:
                     _dbg('Skipping %s (target: %s, goal: %s)' \
                          % (tgt, TARGET, goal))
                     continue
-                _dbg('Examining step list %s' % k)
+                _dbg('Examining step list %s' % K)
                 STEPNO = 0
-                while STEPNO < len(yd[k]):
+                while STEPNO < len(yd[K]):
                     STEPNO += 1
-                    step = yd[k][STEPNO - 1] # STEPNO is 1-based for printing
+                    step = yd[K][STEPNO - 1] # STEPNO is 1-based for printing
                     # We're grabbing the first key in the dictionary.
                     # This works only because there is always only one key.
                     step_key = '(none)'
@@ -726,27 +726,27 @@ for in_file in INPUT_FILES:
                         continue
                     if rsrc_pathname[0] == '+':
                         rsrc_pathname = rsrc_pathname[1:]
-                    words = rsrc_pathname.split('.')
-                    if words[0] == 'aws':
-                        cmdtuple = (words[1], words[2])
+                    WORDS = rsrc_pathname.split('.')
+                    if WORDS[0] == 'aws':
+                        CMDTUPLE = (WORDS[1], WORDS[2])
                         argtupleraw = step[step_key]
                         _inf('Running %s' % rsrc_pathname)
-                        outdict = aws_call(
-                            REGION, PROFILE, cmdtuple,
+                        OUTDICT = aws_call(
+                            REGION, PROFILE, CMDTUPLE,
                             varsub_tuple(argtupleraw))
-                        store_output(rsrc_pathname, outdict)
-                    elif words[0] == 'exec':
-                        cmd = words[1]
+                        store_output(rsrc_pathname, OUTDICT)
+                    elif WORDS[0] == 'exec':
+                        CMD = WORDS[1]
                         argtupleraw = step[step_key]
                         _inf('Running %s' % rsrc_pathname)
-                        outdict = exec_call(
-                            cmd, varsub_tuple(argtupleraw))
-                        store_output(rsrc_pathname, outdict)
-                    elif words[0] == 'ssh':
+                        OUTDICT = exec_call(
+                            CMD, varsub_tuple(argtupleraw))
+                        store_output(rsrc_pathname, OUTDICT)
+                    elif WORDS[0] == 'ssh':
                         argtupleraw = step[step_key]
                         _inf('Running %s' % rsrc_pathname)
-                        args = ['ssh']
-                        args.extend(varsub_tuple(argtupleraw))
-                        response = subprocess.call(args)
+                        ARGS = ['ssh']
+                        ARGS.extend(varsub_tuple(argtupleraw))
+                        response = subprocess.call(ARGS)
                     else:
-                        _err('Unrecognized provider: %s' % words[0])
+                        _err('Unrecognized provider: %s' % WORDS[0])
