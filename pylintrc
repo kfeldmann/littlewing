@@ -64,8 +64,8 @@ confidence=
 disable=useless-return, # This contradicts PEP8!
         no-name-in-module, # We'll find out instantly if this is true
         global-statement, # Using global statement on purpose
-        broad-except, # Using broad except on purpose (forwarding errors from aws-cli)
 
+#        broad-except,
 #        redefined-outer-name,
 
 #disable=print-statement,
