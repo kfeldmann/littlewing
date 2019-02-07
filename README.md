@@ -3,7 +3,7 @@
 Littlewing is a simple infrastructure automation tool.
 
 Littlewing supports only AWS. It leverages
-[aws-cli](https://aws.amazon.com/cli/), and litterally can do
+[aws-cli](https://aws.amazon.com/cli/), and literally can do
 anything that aws-cli can do.
 
 ## How it works
@@ -282,11 +282,11 @@ Loops can be nested.
 
 There is no special concept of modules in Littlewing, but you can easily
 reuse parameterized configurations (see example-apps). The procedure is
-to create a reusable configuration snippet, place it in a commmon directory,
+to create a reusable configuration snippet, place it in a common directory,
 and then symlink it into your application's configuration directory with
 the name of the symlink controlling the sorting of that file within your app.
 
-Typically you will define variables in an application-specific file, then link
+Typically, you will define variables in an application-specific file, then link
 a "module" file after it to execute steps, parameterized by the variables set
 ahead of time.
 
@@ -310,4 +310,4 @@ By versioning the names of steps that _update_ infrastructure, you can
 change the config,
 bump the version, and then `lw` will see those as new steps which have
 not yet run. As a side effect, you will have the output of each of your
-previous versions acumulating in the outputs directory.
+previous versions accumulating in the outputs directory.
