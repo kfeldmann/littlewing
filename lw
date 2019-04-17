@@ -171,7 +171,7 @@ def varsub(val):
     if isinstance(val, int):
         return str(val)
     i = 0
-    while i < 10:
+    while i < 100:
         if MARKER == 'dollar':
             s = re.search(r'\$\{([^${}]+)\}', val)
         else:
