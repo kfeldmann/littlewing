@@ -555,7 +555,7 @@ for in_file in INPUT_FILES:
     F = open(in_file, 'r')
     FILENAME = in_file
     LINENO = '(yaml)'
-    yd = yaml.load(F)
+    yd = yaml.load(F, Loader=yaml.FullLoader)
     F.close()
 
     # Attempt to auto-discover the variable MARKER ('$' or '~')
