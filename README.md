@@ -238,6 +238,22 @@ and/or reused.
 
 Variables and output attributes are all global. There is no local scope.
 
+## AWS Secrets Manager Integration
+
+To dereference a
+[Secrets Manager](https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html)
+secret, use:
+
+```
+~{asm.SECRET_NAME}
+```
+
+Only string secrets are supported.
+You can create the secret using Littlewing, but you should have Littlewing
+set the initial value to a temporary string. Set the actual secret value
+interactively so that the secret is not stored in your code.
+When dereferenced, the secret value will not be written to disk.
+
 ## Loops
 
 Imagine that you want to update all route tables in a certain project,

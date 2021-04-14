@@ -108,6 +108,15 @@ def usage():
     sys.stderr.write('Usage: lw [-l|--list|<target>]\n')
     raise SystemExit(2)
 
+def __var_asm(sec_name):
+    sec_response = aws_call( \
+      REGION,
+      PROFILE,
+      ('secretsmanager', 'get-secret-value'),
+      ('--secret-id', sec_name) \
+    )
+    return sec_response.get('SecretString', '')
+
 def __varsub(in_str):
     "Dereference variables and output references."
     global FILENAME, LINENO
@@ -119,7 +128,7 @@ def __varsub(in_str):
             if words[1] in VAR:
                 return VAR[words[1]]
             raise ValueError('Unknown variable: %s' % words[1])
-        elif len(words) == 3:
+        if len(words) == 3:
             if words[1] in VAR:
                 if isinstance(VAR[words[1]], dict) and words[2] in VAR[words[1]]:
                     return VAR[words[1]][words[2]]
@@ -130,10 +139,13 @@ def __varsub(in_str):
                                  % (words[1], words[2]))
             raise ValueError('Unknown variable: %s.%s'
                              % (words[1], words[2]))
+        raise ValueError('Malformed variable line: %s' % in_str)
     if words[0] == 'aws':
         fname = '.'.join(words[:4])
     elif words[0] == 'exec':
         fname = '.'.join(words[:3])
+    elif words[0] == 'asm':
+        return __var_asm('.'.join(words[1:]))
     else:
         _err('Unknown provider: %s' % words[0])
     try:
@@ -673,17 +685,15 @@ for in_file in INPUT_FILES:
                             _err('Found "end-loop" outside of any loop.')
                         if end_null_loop():
                             continue
-                        else:
-                            if increment_loop_index():
-                                STEPNO = LOOP_STACK[-1][0]
-                            continue
+                        if increment_loop_index():
+                            STEPNO = LOOP_STACK[-1][0]
+                        continue
                     if rsrc_pathname == 'loop':
                         if check_null_loop():
                             add_null_loop()
                             continue
-                        else:
-                            start_loop(STEPNO, step[step_key])
-                            continue
+                        start_loop(STEPNO, step[step_key])
+                        continue
                     if check_null_loop():
                         _dbg('Inside a null loop. Skipping to the end.')
                         continue # If we're inside a null loop, skip to the end-loop
