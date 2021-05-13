@@ -59,6 +59,7 @@ TS = time.strftime('%Y%m%d%H%M%S', time.localtime())
 REGION = None
 PROFILE = None
 VAR = {}
+SECRETS = {}
 TARGET_GROUPS = {}
 MARKER = 'tilde'
 LOOP_STACK = []
@@ -115,7 +116,10 @@ def __var_asm(sec_name):
       ('secretsmanager', 'get-secret-value'),
       ('--secret-id', sec_name) \
     )
-    return sec_response.get('SecretString', '')
+    ss = sec_response.get('SecretString', '')
+    if ss != '':
+        SECRETS[ss] = 1
+    return ss
 
 def __varsub(in_str):
     "Dereference variables and output references."
@@ -250,6 +254,14 @@ def exec_call(cmd, argtuple):
         _err('Failed to run %s: %s' % (cmd, ex))
     return {'Output': outdata}
 
+def redact(s):
+    """
+    Look for secret values in s and redact them.
+    """
+    for sec in SECRETS.keys():
+        s = s.replace(sec, 'redacted')
+    return s
+
 def stringify(path, name, obj):
     """
     Recursively convert heirarchical object into a list of strings,
@@ -270,7 +282,7 @@ def stringify(path, name, obj):
         this = '%s.%s.Count:%d' % (path, name, len(obj))
         strings.append(this.lstrip('.'))
     else:
-        this = '%s.%s:%s' % (path, name, quote(str(obj)))
+        this = '%s.%s:%s' % (path, name, quote(redact(str(obj))))
         strings.append(this.lstrip('.'))
     return strings
 
