@@ -281,6 +281,9 @@ def stringify(path, name, obj):
             i += 1
         this = '%s.%s.Count:%d' % (path, name, len(obj))
         strings.append(this.lstrip('.'))
+    elif isinstance(obj, bytes):
+        this = '%s.%s:%s' % (path, name, quote(redact(obj.decode('utf-8'))))
+        strings.append(this.lstrip('.'))
     else:
         this = '%s.%s:%s' % (path, name, quote(redact(str(obj))))
         strings.append(this.lstrip('.'))
@@ -579,7 +582,7 @@ for in_file in INPUT_FILES:
     F = open(in_file, 'r')
     FILENAME = in_file
     LINENO = '(yaml)'
-    yd = yaml.load(F, Loader=yaml.FullLoader)
+    yd = yaml.load(F, Loader=yaml.Loader)
     F.close()
 
     # Attempt to auto-discover the variable MARKER ('$' or '~')
